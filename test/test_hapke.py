@@ -1,11 +1,10 @@
 import numpy as np
 from astropy.io import fits
-
-from refmod.hapke import double_henyey_greenstein
-from refmod.hapke.imsa import imsa
-from refmod.hapke.amsa import amsa
 from refmod.dtm_helper import dtm2grad
-from refmod.hapke.legendre import coef_b, coef_a
+from refmod.hapke import double_henyey_greenstein
+from refmod.hapke.amsa import amsa
+from refmod.hapke.imsa import imsa
+from refmod.hapke.legendre import coef_a, coef_b
 
 DATA_DIR = "test/data"
 EXTENSION = "fits"
@@ -79,7 +78,8 @@ def test_amsa_hopper():
         e,
         n,
         albedo,
-        lambda x: double_henyey_greenstein(x, b, c),
+        # lambda x: double_henyey_greenstein(x, b, c),
+        "dhg",
         b_n,
         a_n,
         hs,
@@ -87,6 +87,7 @@ def test_amsa_hopper():
         tb,
         hc,
         bc0,
+        (b, c),
     )
     result[np.isnan(refl)] = np.nan
     np.testing.assert_allclose(refl, result)
