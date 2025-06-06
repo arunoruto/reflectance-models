@@ -137,12 +137,12 @@
 
                 virtualenv = editablePythonSet.mkVirtualEnv "${package-name}-dev-env" (
                   workspace.deps.default
-                  # // {
-                  #   "${package-name}" = [
-                  #     "test"
-                  #     "docs"
-                  #   ];
-                  # }
+                  // {
+                    "${package-name}" = [
+                      "test"
+                      # "docs"
+                    ];
+                  }
                 );
 
               in
