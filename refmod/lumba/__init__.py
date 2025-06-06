@@ -1,4 +1,4 @@
-from .hapke import (
+from ..hapke import (
     amsa,
     double_henyey_greenstein,
     imsa,
