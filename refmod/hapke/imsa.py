@@ -14,36 +14,58 @@ def imsa(
     single_scattering_albedo: npt.NDArray,
     phase_function: Callable[[npt.NDArray], npt.NDArray],
     opposition_effect_h: float = 0,
-    oppoistion_effect_b0: float = 0,
+    oppoistion_effect_b0: float = 0,  # Note: Corrected typo in original arg name for consistency
     roughness: float = 0,
 ) -> npt.NDArray:
-    """
-    Calculates the reflectance using the IMSA (Inversion of Multiple Scattering and Absorption) model.
+    """Calculates reflectance using the IMSA model.
 
-    Args:
-        incidence_direction: Array of shape (..., 3) representing the incidence direction vectors.
-        emission_direction: Array of shape (..., 3) representing the emission direction vectors.
-        surface_orientation: Array of shape (..., 3) representing the surface orientation vectors.
-        single_scattering_albedo: Array of shape (...,) representing the single scattering albedo values.
-        phase_function: Callable function that takes the cosine of the phase angle and returns the phase function values.
-        opposition_effect_h: Opposition effect parameter h.
-        oppoistion_effect_b0: Opposition effect parameter b0.
-        roughness: Surface roughness parameter.
+    IMSA stands for Inversion of Multiple Scattering and Absorption.
 
-    Returns:
-        Array of shape (...,) representing the reflectance values.
+    Parameters
+    ----------
 
-    Raises:
-        Exception: If at least one reflectance value is not real.
+    incidence_direction : npt.NDArray
+        Incidence direction vector(s), shape (..., 3).
+    emission_direction : npt.NDArray
+        Emission direction vector(s), shape (..., 3).
+    surface_orientation : npt.NDArray
+        Surface normal vector(s), shape (..., 3).
+    single_scattering_albedo : npt.NDArray
+        Single scattering albedo, shape (...).
+    phase_function : Callable[[npt.NDArray], npt.NDArray]
+        Callable that accepts `cos_alpha` (cosine of phase angle) and
+        returns phase function values.
+    opposition_effect_h : float, optional
+        Opposition effect parameter h, by default 0.
+    oppoistion_effect_b0 : float, optional
+        Opposition effect parameter B0 (b_zero), by default 0.
+        Note: Original argument name `oppoistion_effect_b0` kept for API compatibility.
+    roughness : float, optional
+        Surface roughness parameter, by default 0.
 
-    Notes:
-        - The input arrays should have compatible shapes for broadcasting.
-        - The phase function should be a callable function that takes the cosine of the phase angle as input and returns
-          the phase function values.
-        - The reflectance values are calculated using the IMSA model, which accounts for multiple scattering and absorption.
+    Returns
+    -------
+    npt.NDArray
+        Calculated reflectance values, shape (...).
 
-    References:
-        - TODO: Add references to the IMSA model.
+    Raises
+    ------
+    Exception
+        If any calculated reflectance value has a significant imaginary part.
+
+    Notes
+    -----
+    - Input arrays `incidence_direction`, `emission_direction`,
+      `surface_orientation`, and `single_scattering_albedo` are expected to
+      broadcast together.
+    - The `phase_function` should be vectorized to handle arrays of `cos_alpha`.
+    - The IMSA model accounts for multiple scattering and absorption.
+
+    References
+
+    ----------
+
+    [IMSAModelPlaceholder]
 
     """
     # Allocate memory

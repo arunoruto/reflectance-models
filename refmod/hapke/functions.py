@@ -1,7 +1,7 @@
 """
 ??? info "References"
 
-    1. Cornette, J. J., & Shanks, R. E. (1992). Bidirectional reflectance
+    1. Cornette and Shanks (1992). Bidirectional reflectance
     of flat, optically thick particulate systems. Applied Optics, 31(15),
     3152-3160. <https://doi.org/10.1364/AO.31.003152>
 """
@@ -21,11 +21,51 @@ PhaseFunctionType = Literal[
 
 
 def h_function_1(x: npt.NDArray, w: npt.NDArray) -> npt.NDArray:
+    """Calculates the H-function (level 1).
+
+    Parameters
+    ----------
+
+    x : npt.NDArray
+        Input parameter.
+    w : npt.NDArray
+        Single scattering albedo.
+
+    Returns
+    -------
+    npt.NDArray
+        H-function values.
+
+    References
+    ----------
+    Hapke (1993, p. 121, Eq. 8.31a).
+    """
     gamma = np.sqrt(1 - w)
     return (1 + 2 * x) / (1 + 2 * x * gamma)
 
 
 def h_function_2(x: npt.NDArray, w: npt.NDArray) -> npt.NDArray:
+    """Calculates the H-function (level 2).
+
+    This function is based on the work of Cornette & Shanks (1992).
+
+    Parameters
+    ----------
+
+    x : npt.NDArray
+        Input parameter, often mu or mu_0 (cosine of angles).
+    w : npt.NDArray
+        Single scattering albedo.
+
+    Returns
+    -------
+    npt.NDArray
+        H-function values.
+
+    References
+    ----------
+    Cornette and Shanks (1992)
+    """
     gamma = np.sqrt(1 - w)
     r0 = (1 - gamma) / (1 + gamma)
     h_inv = 1 - w * x * (r0 + (1 - 2 * r0 * x) / 2 * np.log(1 + 1 / x))
@@ -33,6 +73,21 @@ def h_function_2(x: npt.NDArray, w: npt.NDArray) -> npt.NDArray:
 
 
 def h_function_2_derivative(x: npt.NDArray, w: npt.NDArray) -> npt.NDArray:
+    """Calculates the derivative of the H-function (level 2) with respect to w.
+
+    Parameters
+    ----------
+
+    x : npt.NDArray
+        Input parameter, often mu or mu_0 (cosine of angles).
+    w : npt.NDArray
+        Single scattering albedo.
+
+    Returns
+    -------
+    npt.NDArray
+        Derivative of the H-function (level 2) with respect to w.
+    """
     gamma = np.sqrt(1 - w)
     r0 = (1 - gamma) / (1 + gamma)
     x_log_term = np.log(1 + 1 / x)
@@ -47,19 +102,31 @@ def h_function_2_derivative(x: npt.NDArray, w: npt.NDArray) -> npt.NDArray:
 
 
 def h_function(x: npt.NDArray, w: npt.NDArray, level: int = 1) -> npt.NDArray:
-    """
-    Calculates the Hapke function for a given set of parameters.
+    """Calculates the Hapke H-function.
 
-    Args:
-        x (float): The input parameter.
-        w (numpy.ndarray): The weight array.
-        level (int, optional): The level of the Hapke function to calculate. Defaults to 1.
+    This function can compute two different versions (levels) of the H-function.
 
-    Returns:
-        (float): The calculated Hapke function value.
+    Parameters
+    ----------
 
-    Raises:
-        Exception: If an invalid level is provided.
+    x : npt.NDArray
+        Input parameter, often mu or mu_0 (cosine of angles).
+    w : npt.NDArray
+        Single scattering albedo.
+    level : int, optional
+        Level of the H-function to calculate (1 or 2), by default 1.
+        Level 1 refers to `h_function_1`.
+        Level 2 refers to `h_function_2`.
+
+    Returns
+    -------
+    npt.NDArray
+        Calculated H-function values.
+
+    Raises
+    ------
+    Exception
+        If an invalid level (not 1 or 2) is provided.
     """
 
     match level:
@@ -76,19 +143,34 @@ def h_function(x: npt.NDArray, w: npt.NDArray, level: int = 1) -> npt.NDArray:
 def h_function_derivative(
     x: npt.NDArray, w: npt.NDArray, level: int = 1
 ) -> npt.NDArray:
-    """
-    Calculates the Hapke function for a given set of parameters.
+    """Calculates the derivative of the Hapke H-function with respect to w.
 
-    Args:
-        x (float): The input parameter.
-        w (numpy.ndarray): The weight array.
-        level (int, optional): The level of the Hapke function to calculate. Defaults to 1.
+    This function can compute the derivative for two different versions (levels)
+    of the H-function.
 
-    Returns:
-        (float): The calculated Hapke function value.
+    Parameters
+    ----------
 
-    Raises:
-        Exception: If an invalid level is provided.
+    x : npt.NDArray
+        Input parameter, often mu or mu_0 (cosine of angles).
+    w : npt.NDArray
+        Single scattering albedo.
+    level : int, optional
+        Level of the H-function derivative to calculate (1 or 2), by default 1.
+        Level 1 derivative is not implemented.
+        Level 2 refers to `h_function_2_derivative`.
+
+    Returns
+    -------
+    npt.NDArray
+        Calculated H-function derivative values.
+
+    Raises
+    ------
+    NotImplementedError
+        If level 1 is selected, as its derivative is not implemented.
+    Exception
+        If an invalid level (not 1 or 2) is provided.
     """
 
     match level:
@@ -105,18 +187,23 @@ def h_function_derivative(
     return dh_dw
 
 
-def double_henyey_greenstein(cos_g, b: float = 0.21, c: float = 0.7):
-    """
-    Calculates the phase function for the double Henyey-Greenstein model.
+def double_henyey_greenstein(cos_g: npt.NDArray, b: float = 0.21, c: float = 0.7) -> npt.NDArray:
+    """Calculates the Double Henyey-Greenstein phase function.
 
-    Args:
-        cos_g (float): The cosine of the scattering angle.
-        b (float, optional): The asymmetry parameter. Defaults to 0.21.
-        c (float, optional): The backscatter fraction. Defaults to 0.7.
+    Parameters
+    ----------
 
-    Returns:
-        (float): The phase function value.
+    cos_g : npt.NDArray
+        Cosine of the scattering angle (g).
+    b : float, optional
+        Asymmetry parameter, by default 0.21.
+    c : float, optional
+        Backscatter fraction, by default 0.7.
 
+    Returns
+    -------
+    npt.NDArray
+        Phase function values.
     """
     return (
         (1 + c) / 2 * (1 - b**2) / np.power(1 - 2 * b * cos_g + b**2, 1.5)
@@ -125,20 +212,26 @@ def double_henyey_greenstein(cos_g, b: float = 0.21, c: float = 0.7):
     )
 
 
-def cornette_shanks(cos_g, xi: float):
-    """
-    Calculates the Cornette-Shanks function.
+def cornette_shanks(cos_g: npt.NDArray, xi: float) -> npt.NDArray:
+    """Calculates the Cornette-Shanks phase function.
 
-    Args:
-        cos_g (float): The cosine of the incidence angle.
-        xi (float): The single scattering albedo.
+    Parameters
+    ----------
 
-    Returns:
-        (float): The value of the Cornette-Shanks function.
+    cos_g : npt.NDArray
+        Cosine of the scattering angle (g).
+    xi : float
+        Asymmetry parameter, related to the average scattering angle.
+        Note: This `xi` is different from the single scattering albedo `w`.
 
-    Note:
-        Equation 8 from Cornette and Shanks (1992).
+    Returns
+    -------
+    npt.NDArray
+        Phase function values.
 
+    References
+    ----------
+    Cornette and Shanks (1992, Eq. 8).
     """
     return (
         1.5
@@ -153,7 +246,34 @@ def phase_function(
     cos_g: npt.NDArray,
     type: PhaseFunctionType,
     args: tuple,
-):
+) -> npt.NDArray:
+    """Selects and evaluates a phase function.
+
+    Parameters
+    ----------
+
+    cos_g : npt.NDArray
+        Cosine of the scattering angle (g).
+    type : PhaseFunctionType
+        Type of phase function to use.
+        Valid options are:
+        - "dhg" or "double_henyey_greenstein": Double Henyey-Greenstein
+        - "cs" or "cornette" or "cornette_shanks": Cornette-Shanks
+    args : tuple
+        Arguments for the selected phase function.
+        - For "dhg": (b, c) where b is asymmetry and c is backscatter fraction.
+        - For "cs": (xi,) where xi is the Cornette-Shanks asymmetry parameter.
+
+    Returns
+    -------
+    npt.NDArray
+        Calculated phase function values.
+
+    Raises
+    ------
+    Exception
+        If an unsupported `type` is provided.
+    """
     match type:
         case "dhg" | "double_henyey_greenstein":
             return double_henyey_greenstein(cos_g, args[0], args[1])
@@ -163,14 +283,53 @@ def phase_function(
             raise Exception("Unsupported phase function")
 
 
-def normalize(x, axis: int = -1):
+def normalize(x: npt.NDArray, axis: int = -1) -> npt.NDArray:
+    """Normalizes a vector or a batch of vectors.
+
+    Calculates the L2 norm (Euclidean norm) of the input array along the
+    specified axis.
+
+    Parameters
+    ----------
+
+    x : npt.NDArray
+        Input array representing a vector or a batch of vectors.
+    axis : int, optional
+        Axis along which to compute the norm, by default -1.
+
+    Returns
+    -------
+    npt.NDArray
+        The L2 norm of the input array. If `x` is a batch of vectors,
+        the output will be an array of norms.
+    """
     temp = np.sum(x**2, axis=axis)
     if isinstance(temp, float):
         temp = np.array([temp])
     return np.sqrt(temp)
 
 
-def normalize_keepdims(x, axis: int = -1):
+def normalize_keepdims(x: npt.NDArray, axis: int = -1) -> npt.NDArray:
+    """Normalizes a vector or batch of vectors, keeping dimensions.
+
+    Calculates the L2 norm of the input array along the specified axis,
+    then expands the dimensions of the output to match the input array's
+    dimension along the normalization axis. This is useful for broadcasting
+    the norm for division.
+
+    Parameters
+    ----------
+
+    x : npt.NDArray
+        Input array representing a vector or a batch of vectors.
+    axis : int, optional
+        Axis along which to compute the norm, by default -1.
+
+    Returns
+    -------
+    npt.NDArray
+        The L2 norm of the input array, with dimensions kept for broadcasting.
+    """
     temp = np.sqrt(np.sum(x**2, axis=axis))
     if isinstance(temp, float):
         temp = np.array(temp)
@@ -178,7 +337,30 @@ def normalize_keepdims(x, axis: int = -1):
     return np.expand_dims(temp, axis=axis)
 
 
-def angle_processing_base(vec_a: npt.NDArray, vec_b: npt.NDArray, axis: int = -1):
+def angle_processing_base(
+    vec_a: npt.NDArray, vec_b: npt.NDArray, axis: int = -1
+) -> tuple[npt.NDArray, npt.NDArray]:
+    """Computes cosine and sine of the angle between two vectors.
+
+    Parameters
+    ----------
+
+    vec_a : npt.NDArray
+        First vector or batch of vectors.
+    vec_b : npt.NDArray
+        Second vector or batch of vectors. Must have the same shape as vec_a.
+    axis : int, optional
+        Axis along which the dot product is performed, by default -1.
+
+    Returns
+    -------
+    tuple[npt.NDArray, npt.NDArray]
+        A tuple containing:
+            - cos_phi : npt.NDArray
+                Cosine of the angle(s) between vec_a and vec_b.
+            - sin_phi : npt.NDArray
+                Sine of the angle(s) between vec_a and vec_b.
+    """
     cos_phi = np.sum(vec_a * vec_b, axis=axis)
     cos_phi = np.array([cos_phi]) if isinstance(cos_phi, float) else cos_phi
     cos_phi = np.clip(cos_phi, -1, 1)
@@ -186,7 +368,35 @@ def angle_processing_base(vec_a: npt.NDArray, vec_b: npt.NDArray, axis: int = -1
     return cos_phi, sin_phi
 
 
-def angle_processing(vec_a: npt.NDArray, vec_b: npt.NDArray, axis: int = -1):
+def angle_processing(
+    vec_a: npt.NDArray, vec_b: npt.NDArray, axis: int = -1
+) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
+    """Computes various trigonometric quantities related to the angle between two vectors.
+
+    Parameters
+    ----------
+
+    vec_a : npt.NDArray
+        First vector or batch of vectors.
+    vec_b : npt.NDArray
+        Second vector or batch of vectors. Must have the same shape as vec_a.
+    axis : int, optional
+        Axis along which the dot product is performed, by default -1.
+
+    Returns
+    -------
+    tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]
+        A tuple containing:
+            - cos_phi : npt.NDArray
+                Cosine of the angle(s) between vec_a and vec_b.
+            - sin_phi : npt.NDArray
+                Sine of the angle(s) between vec_a and vec_b.
+            - cot_phi : npt.NDArray
+                Cotangent of the angle(s) between vec_a and vec_b.
+                (Returns np.inf where sin_phi is 0).
+            - i : npt.NDArray
+                The angle(s) in radians between vec_a and vec_b (i.e., arccos(cos_phi)).
+    """
     cos_phi, sin_phi = angle_processing_base(vec_a, vec_b, axis)
     cot_phi = np.where(sin_phi == 0, np.inf, cos_phi / sin_phi)
     i = np.arccos(cos_phi)

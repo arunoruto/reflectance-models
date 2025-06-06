@@ -1,43 +1,56 @@
-"""
+"""Surface roughness corrections based on Hapke's model.
+
+This module provides functions to calculate corrections for macroscopic
+surface roughness, a key component in photometric modeling as described
+by Hapke.
+
 ??? info "References"
 
-    1. Hapke, B. (1984). Bidirectional reflectance spectroscopy: 3.
-    Correction for macroscopic roughness. Icarus, 59(1), 41-59.
-    <https://doi.org/10.1016/0019-1035(84)90054-X>
+    Hapke (1984)
 """
 
 import numpy as np
 import numpy.typing as npt
 
 
-def __f_exp(x: npt.NDArray, y: float):
-    """
-    Helper for the micoscopic roughness:
-    calculates the exponential function for the given inputs.
+def __f_exp(x: npt.NDArray, y: float) -> npt.NDArray:
+    """Helper function for microscopic roughness calculation.
 
-    Args:
-        x (numpy.ndarray): The input array.
-        y (float): The exponential factor.
+    Calculates `exp(-2 * y * x / pi)`.
 
-    Returns:
-        (np.ndarray): The result of the exponential function.
+    Parameters
+    ----------
 
+    x : npt.NDArray
+        Input array.
+    y : float
+        Factor, typically related to cot(roughness).
+
+    Returns
+    -------
+    npt.NDArray
+        Result of the exponential function.
     """
     return np.exp(-2 / np.pi * y * x)
 
 
-def __f_exp_2(x: npt.NDArray, y: float):
-    """
-    Helper for the micoscopic roughness:
-    calculates the exponential function with a squared term.
+def __f_exp_2(x: npt.NDArray, y: float) -> npt.NDArray:
+    """Helper function for microscopic roughness calculation.
 
-    Args:
-        x (numpy.ndarray): The input array.
-        y (float): The value to be squared.
+    Calculates `exp(-(y^2 * x^2) / pi)`.
 
-    Returns:
-        (np.ndarray): The result of the exponential function.
+    Parameters
+    ----------
 
+    x : npt.NDArray
+        Input array.
+    y : float
+        Factor, typically related to cot(roughness), which is squared.
+
+    Returns
+    -------
+    npt.NDArray
+        Result of the exponential function.
     """
     return np.exp(-(y**2) * x**2 / np.pi)
 
@@ -47,27 +60,60 @@ def microscopic_roughness(
     incidence_direction: npt.NDArray,
     emission_direction: npt.NDArray,
     surface_orientation: npt.NDArray,
-):
-    r"""
-    Calculates the microscopic roughness factor for the Hapke reflectance model.
+) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
+    r"""Calculates the microscopic roughness factor for Hapke's model.
 
-    Args:
-        roughness (float): The roughness parameter.
-        incidence_direction (numpy.ndarray): Array of incidence directions.
-        emission_direction (numpy.ndarray): Array of emission directions.
-        surface_orientation (numpy.ndarray): Array of surface orientations.
+    This correction accounts for the effects of sub-resolution roughness on
+    the observed reflectance.
 
-    Returns:
-        s (numpy.ndarray): The microscopic roughness factor.
-        mu_0 (numpy.ndarray): The modified incidence-normal cosine value ($\mu_0^{\prime}$).
-        mu (numpy.ndarray): The modified emission-normal cosine value ($\mu^{\prime}$).
+    Parameters
+    ----------
 
-    Note:
-        - prime-zero terms: equations 48 and 49 in Hapke (1984).
-        - $i  < e$: equations 46 and 47 in Hapke (1984).
-        - $i >= e$: equations 50 and 51 in Hapke (1984).
+    roughness : float
+        The mean slope angle of surface facets, in radians.
+        A value of 0 means a smooth surface.
+    incidence_direction : npt.NDArray
+        Incidence direction vector(s), shape (..., 3). Assumed to be normalized.
+    emission_direction : npt.NDArray
+        Emission direction vector(s), shape (..., 3). Assumed to be normalized.
+    surface_orientation : npt.NDArray
+        Surface normal vector(s), shape (..., 3). Assumed to be normalized.
+
+    Returns
+    -------
+    s : npt.NDArray
+        The microscopic roughness factor, shape (...).
+    mu_0_prime : npt.NDArray
+        The modified cosine of the incidence angle ($\mu_0^{\prime}$), accounting
+        for roughness, shape (...).
+    mu_prime : npt.NDArray
+        The modified cosine of the emission angle ($\mu^{\prime}$), accounting
+        for roughness, shape (...).
+
+    Notes
+    -----
+    The calculations are based on Hapke (1984).
+
+    - The terms $\mu_0^{\prime}$ (mu_0_s0, mu_0_s) and $\mu^{\prime}$ (mu_s0, mu_s)
+      are calculated based on different conditions for incidence angle `i`
+      and emission angle `e`:
+
+      - For prime-zero terms ($\mu_0^{\prime(0)}$, $\mu^{\prime(0)}$ used in `mu_0_s0`, `mu_s0`):
+        See Hapke (1984, Eqs. 48, 49).
+      - For $\mu_0^{\prime}$ and $\mu^{\prime}$ when $i < e$:
+        See Hapke (1984, Eqs. 46, 47).
+      - For $\mu_0^{\prime}$ and $\mu^{\prime}$ when $i \ge e$:
+        See Hapke (1984, Eqs. 50, 51).
+
+    - Input vectors (`incidence_direction`, `emission_direction`, `surface_orientation`)
+      are normalized internally.
+    - If `roughness` is 0, `s` is 1, `mu_0_prime` is `cos(i)`, and `mu_prime` is `cos(e)`.
+
+    References
+    ----------
+    Hapke (1984)
+
     """
-
     # Angles
     incidence_direction /= np.linalg.norm(
         incidence_direction, axis=-1, keepdims=True
