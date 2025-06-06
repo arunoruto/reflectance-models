@@ -27,6 +27,63 @@ def __amsa_preprocess(
     bc0: float = 0.0,
     phase_function_args: tuple = (),
 ):
+    """Preprocesses the inputs for the AMSA model.
+
+    Parameters
+    ----------
+
+    single_scattering_albedo : npt.NDArray
+        Single scattering albedo.
+    incidence_direction : npt.NDArray
+        Incidence direction vector(s) of shape (..., 3).
+    emission_direction : npt.NDArray
+        Emission direction vector(s) of shape (..., 3).
+    surface_orientation : npt.NDArray
+        Surface orientation vector(s) of shape (..., 3).
+    phase_function_type : PhaseFunctionType
+        Type of phase function to use.
+    b_n : npt.NDArray
+        Coefficients of the Legendre expansion.
+    a_n : npt.NDArray
+        Coefficients of the Legendre expansion.
+    roughness : float, optional
+        Surface roughness, by default 0.0.
+    hs : float, optional
+        Shadowing parameter, by default 0.0.
+    bs0 : float, optional
+        Shadowing parameter, by default 0.0.
+    hc : float, optional
+        Coherent backscattering parameter, by default 0.0.
+    bc0 : float, optional
+        Coherent backscattering parameter, by default 0.0.
+    phase_function_args : tuple, optional
+        Additional arguments for the phase function, by default ().
+
+    Returns
+    -------
+    tuple
+        A tuple containing:
+            - albedo_independent : npt.NDArray
+                Albedo-independent term.
+            - mu_0 : npt.NDArray
+                Cosine of the incidence angle.
+            - mu : npt.NDArray
+                Cosine of the emission angle.
+            - p_g : npt.NDArray
+                Phase function values.
+            - m : npt.NDArray
+                M term.
+            - p_mu_0 : npt.NDArray
+                Legendre polynomial values for mu_0.
+            - p_mu : npt.NDArray
+                Legendre polynomial values for mu.
+            - p : npt.NDArray
+                Legendre polynomial values.
+            - h_mu_0 : npt.NDArray
+                H-function values for mu_0.
+            - h_mu : npt.NDArray
+                H-function values for mu.
+    """
     # Angles
     incidence_direction /= normalize_keepdims(incidence_direction)
     emission_direction /= normalize_keepdims(emission_direction)
@@ -103,29 +160,55 @@ def amsa(
     phase_function_args: tuple = (),
     refl_optimization: npt.NDArray | None = None,
 ) -> npt.NDArray:
-    """
-    Calculates the reflectance using the AMSA (Advanced Modified Shadowing and Coherent Backscattering) model.
+    """Calculates the reflectance using the AMSA model.
 
-    Args:
-        incidence_direction: Array of shape (number_u, number_v, 3) representing the incidence direction vectors.
-        emission_direction: Array of shape (number_u, number_v, 3) representing the emission direction vectors.
-        surface_orientation: Array of shape (number_u, number_v, 3) representing the surface orientation vectors.
-        single_scattering_albedo: Array of shape (number_u, number_v) representing the single scattering albedo values.
-        phase_function: Callable function that takes the cosine of the scattering angle and returns the phase function values.
-        b_n: Array of shape (n,) representing the coefficients of the Legendre expansion.
-        a_n: Array of shape (n,) representing the coefficients of the Legendre expansion. Defaults to np.empty(1) * np.nan.
-        hs: Float representing the shadowing parameter. Defaults to 0.
-        bs0: Float representing the shadowing parameter. Defaults to 0.
-        roughness: Float representing the surface roughness. Defaults to 0.
-        hc: Float representing the coherent backscattering parameter. Defaults to 0.
-        bc0: Float representing the coherent backscattering parameter. Defaults to 0.
+    Parameters
+    ----------
 
-    Returns:
-        Array of shape (number_u, number_v) representing the reflectance values.
+    incidence_direction : npt.NDArray
+        Incidence direction vector(s) of shape (..., 3).
+    emission_direction : npt.NDArray
+        Emission direction vector(s) of shape (..., 3).
+    surface_orientation : npt.NDArray
+        Surface orientation vector(s) of shape (..., 3).
+    single_scattering_albedo : npt.NDArray
+        Single scattering albedo.
+    phase_function_type : PhaseFunctionType
+        Type of phase function to use.
+    b_n : npt.NDArray
+        Coefficients of the Legendre expansion.
+    a_n : npt.NDArray
+        Coefficients of the Legendre expansion.
+    hs : float, optional
+        Shadowing parameter, by default 0.
+    bs0 : float, optional
+        Shadowing parameter, by default 0.
+    roughness : float, optional
+        Surface roughness, by default 0.
+    hc : float, optional
+        Coherent backscattering parameter, by default 0.
+    bc0 : float, optional
+        Coherent backscattering parameter, by default 0.
+    phase_function_args : tuple, optional
+        Additional arguments for the phase function, by default ().
+    refl_optimization : npt.NDArray | None, optional
+        Reflectance optimization array, by default None.
 
-    Raises:
-        Exception: If at least one reflectance value is not real.
+    Returns
+    -------
+    npt.NDArray
+        Reflectance values.
 
+    Raises
+    ------
+    Exception
+        If at least one reflectance value is not real.
+
+    References
+
+    ----------
+
+    [AMSAModelPlaceholder]
     """
     (
         albedo_independent,
@@ -189,6 +272,52 @@ def amsa_derivative(
     phase_function_args: tuple = (),
     refl_optimization: npt.NDArray | None = None,
 ) -> npt.NDArray:
+    """Calculates the derivative of the reflectance using the AMSA model.
+
+    Parameters
+    ----------
+
+    single_scattering_albedo : npt.NDArray
+        Single scattering albedo.
+    incidence_direction : npt.NDArray
+        Incidence direction vector(s) of shape (..., 3).
+    emission_direction : npt.NDArray
+        Emission direction vector(s) of shape (..., 3).
+    surface_orientation : npt.NDArray
+        Surface orientation vector(s) of shape (..., 3).
+    phase_function_type : PhaseFunctionType
+        Type of phase function to use.
+    b_n : npt.NDArray
+        Coefficients of the Legendre expansion.
+    a_n : npt.NDArray
+        Coefficients of the Legendre expansion.
+    roughness : float, optional
+        Surface roughness, by default 0.
+    hs : float, optional
+        Shadowing parameter, by default 0.
+    bs0 : float, optional
+        Shadowing parameter, by default 0.
+    hc : float, optional
+        Coherent backscattering parameter, by default 0.
+    bc0 : float, optional
+        Coherent backscattering parameter, by default 0.
+    phase_function_args : tuple, optional
+        Additional arguments for the phase function, by default ().
+    refl_optimization : npt.NDArray | None, optional
+        Reflectance optimization array, by default None.
+        This parameter is not used in the derivative calculation.
+
+    Returns
+    -------
+    npt.NDArray
+        Derivative of the reflectance with respect to single scattering albedo.
+
+    References
+
+    ----------
+
+    [AMSAModelPlaceholder]
+    """
     (
         albedo_independent,
         mu_0,
