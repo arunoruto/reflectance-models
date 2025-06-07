@@ -13,7 +13,7 @@
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/arunoruto/refmod"> <!-- TODO: Replace with actual link -->
+  <a href="https://github.com/arunoruto/reflectance-models"> <!-- TODO: Replace with actual link -->
     <!-- <img src="images/logo.png" alt="Logo" width="80" height="80"> TODO: Add logo if available -->
   </a>
 
@@ -22,14 +22,14 @@
   <p align="center">
     A Python library for the Hapke photometric model, used for modeling light scattering from surfaces.
     <br />
-    <a href="https://github.com/arunoruto/refmod"><strong>Explore the docs »</strong></a> <!-- TODO: Replace with actual link -->
+    <a href="https://github.com/arunoruto/reflectance-models"><strong>Explore the docs »</strong></a> <!-- TODO: Replace with actual link -->
     <br />
     <br />
-    <a href="https://github.com/arunoruto/refmod">View Demo</a> <!-- TODO: Replace with actual link -->
+    <a href="https://github.com/arunoruto/reflectance-models">View Demo</a> <!-- TODO: Replace with actual link -->
     &middot;
-    <a href="https://github.com/arunoruto/refmod/issues/new?labels=bug&template=bug-report---.md">Report Bug</a> <!-- TODO: Replace with actual link -->
+    <a href="https://github.com/arunoruto/reflectance-models/issues/new?labels=bug&template=bug-report---.md">Report Bug</a> <!-- TODO: Replace with actual link -->
     &middot;
-    <a href="https://github.com/arunoruto/refmod/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a> <!-- TODO: Replace with actual link -->
+    <a href="https://github.com/arunoruto/reflectance-models/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a> <!-- TODO: Replace with actual link -->
   </p>
 </div>
 
@@ -148,7 +148,7 @@ _For more detailed examples, please refer to the [Documentation](https://arunoru
 - [ ] Comprehensive test suite.
 - [ ] Detailed documentation and example notebooks.
 
-See the [open issues](https://github.com/arunoruto/refmod/issues) for a full list of proposed features (and known issues). <!-- TODO: Replace with actual link -->
+See the [open issues](https://github.com/arunoruto/reflectance-models/issues) for a full list of proposed features (and known issues). <!-- TODO: Replace with actual link -->
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -183,7 +183,7 @@ Distributed under the MIT License. See `LICENSE.txt` for details.
 
 ## Contact
 
-Project Link: [https://github.com/arunoruto/refmod](https://github.com/arunoruto/refmod) <!-- TODO: Replace with actual link -->
+Project Link: [https://github.com/arunoruto/reflectance-models](https://github.com/arunoruto/reflectance-models) <!-- TODO: Replace with actual link -->
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -201,16 +201,16 @@ Project Link: [https://github.com/arunoruto/refmod](https://github.com/arunoruto
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- TODO: Update these links and add new ones as needed -->
 
-[contributors-shield]: https://img.shields.io/github/contributors/arunoruto/refmod.svg?style=for-the-badge
-[contributors-url]: https://github.com/arunoruto/refmod/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/arunoruto/refmod.svg?style=for-the-badge
-[forks-url]: https://github.com/arunoruto/refmod/network/members
-[stars-shield]: https://img.shields.io/github/stars/arunoruto/refmod.svg?style=for-the-badge
-[stars-url]: https://github.com/arunoruto/refmod/stargazers
-[issues-shield]: https://img.shields.io/github/issues/arunoruto/refmod.svg?style=for-the-badge
-[issues-url]: https://github.com/arunoruto/refmod/issues
+[contributors-shield]: https://img.shields.io/github/contributors/arunoruto/reflectance-models.svg?style=for-the-badge
+[contributors-url]: https://github.com/arunoruto/reflectance-models/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/arunoruto/reflectance-models.svg?style=for-the-badge
+[forks-url]: https://github.com/arunoruto/reflectance-models/network/members
+[stars-shield]: https://img.shields.io/github/stars/arunoruto/reflectance-models.svg?style=for-the-badge
+[stars-url]: https://github.com/arunoruto/reflectance-models/stargazers
+[issues-shield]: https://img.shields.io/github/issues/arunoruto/reflectance-models.svg?style=for-the-badge
+[issues-url]: https://github.com/arunoruto/reflectance-models/issues
 [license-shield]: https://img.shields.io/badge/License-MIT-yellow.svg
-[license-url]: https://github.com/arunoruto/refmod/blob/master/LICENSE
+[license-url]: https://github.com/arunoruto/reflectance-models/blob/master/LICENSE
 [Python.org]: https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white
 [Python-url]: https://www.python.org/
 [Numpy.org]: https://img.shields.io/badge/Numpy-013243?style=for-the-badge&logo=numpy&logoColor=white
