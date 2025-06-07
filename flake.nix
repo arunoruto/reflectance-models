@@ -140,7 +140,7 @@
                   // {
                     "${package-name}" = [
                       "test"
-                      # "docs"
+                      "docs"
                     ];
                   }
                 );
