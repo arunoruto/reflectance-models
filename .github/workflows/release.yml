@@ -17,7 +17,7 @@ jobs:
       - testing
 
     concurrency:
-      group: ${{ github.workflow }}-release-${{ github.ref_name }}
+      group: ${{ github.ref }}-${{ github.workflow }}
       cancel-in-progress: false
     environment:
       name: pypi

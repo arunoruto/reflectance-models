@@ -8,7 +8,7 @@ on:
       - ".github/workflows/docs.yml"
 
 concurrency:
-  group: ${{ github.ref }}
+  group: ${{ github.ref }}-${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
@@ -28,11 +28,13 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Setup | Export requirements
-        run: uv export --no-hashes --only-group docs > ./docs/requirements.txt
+        run: |
+          uv export --no-hashes --only-group docs > ./docs/requirements.txt
+          cat ./docs/requirements.txt
 
       - id: deployment
         uses: sphinx-notes/pages@v3
         with:
           checkout: false
-          cache: true
+          cache: false
           documentation_path: ./docs/source
