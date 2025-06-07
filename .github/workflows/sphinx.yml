@@ -5,21 +5,15 @@ on:
   push:
     paths:
       - "docs/**/*"
-      - ".github/workflows/docs.yml"
+      - ".github/workflows/sphinx.yml"
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
-  docs:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    permissions:
-      pages: write
-      id-token: write
     steps:
       - name: Setup | Checkout repository
         uses: actions/checkout@v4
@@ -29,12 +23,45 @@ jobs:
 
       - name: Setup | Export requirements
         run: |
-          uv export --no-hashes --only-group docs > ./docs/requirements.txt
-          cat ./docs/requirements.txt
+          # uv export --no-hashes --only-group docs > ./docs/requirements.txt
+          # uv export --no-hashes --group docs -o ./docs/requirements.txt --prune doctuils --prune sphinx
+          # cat ./docs/requirements.txt
+          # uv pip install --system -r ./docs/requirements.txt
+          uv sync --only-group docs
 
-      - id: deployment
-        uses: sphinx-notes/pages@v3
+      - name: Build | Run Makefile
+        run: |
+          cd docs
+          uv run sphinx-build -M html ./source ./build
+
+      - name: Deploy | Create artifact of website
+        id: deployment
+        uses: actions/upload-pages-artifact@v3
         with:
-          checkout: false
-          cache: false
-          documentation_path: ./docs/source
+          path: docs/build/html/
+          # name: sphinx-html
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy| GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        # with:
+        #   artifact_name: sphinx-html
+
+    # - id: deployment
+    #   uses: sphinx-notes/pages@v3
+    #   with:
+    #     checkout: false
+    #     cache: false
+    #     documentation_path: ./docs/source
+    #     requirements_path: ./docs/requirements.txt
+    #     pyproject_extras: ""

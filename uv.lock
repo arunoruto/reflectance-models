@@ -1603,6 +1603,7 @@ numba = [
 
 [package.dev-dependencies]
 docs = [
+    { name = "docutils" },
     { name = "linkify-it-py" },
     { name = "myst-parser" },
     { name = "pydata-sphinx-theme" },
@@ -1640,6 +1641,7 @@ provides-extras = ["jax", "numba"]
 
 [package.metadata.requires-dev]
 docs = [
+    { name = "docutils", specifier = ">=0.21.2" },
     { name = "linkify-it-py", specifier = ">=2.0.3" },
     { name = "myst-parser", specifier = ">=4.0.1" },
     { name = "pydata-sphinx-theme", specifier = ">=0.16.1" },
