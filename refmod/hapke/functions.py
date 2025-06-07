@@ -47,8 +47,6 @@ def h_function_1(x: npt.NDArray, w: npt.NDArray) -> npt.NDArray:
 def h_function_2(x: npt.NDArray, w: npt.NDArray) -> npt.NDArray:
     """Calculates the H-function (level 2).
 
-    This function is based on the work of Cornette & Shanks (1992).
-
     Parameters
     ----------
 
@@ -187,7 +185,9 @@ def h_function_derivative(
     return dh_dw
 
 
-def double_henyey_greenstein(cos_g: npt.NDArray, b: float = 0.21, c: float = 0.7) -> npt.NDArray:
+def double_henyey_greenstein(
+    cos_g: npt.NDArray, b: float = 0.21, c: float = 0.7
+) -> npt.NDArray:
     """Calculates the Double Henyey-Greenstein phase function.
 
     Parameters

@@ -27,19 +27,14 @@ A general form for the IMSA model, as suggested by the `refmod.hapke.imsa.imsa` 
 2348 r(i, e, g) = \frac{w}{4\pi} \frac{\mu_0}{\mu_0 + \mu} S \cdot \left[ B_G(g) p(g) + H(\mu_0, w)H(\mu, w) - 1 \right] 2348
 
 Where:
--   $\mu_0$ and $\mu$ are effective cosines of incidence/emission angles after roughness correction.
--   (g)$ is the opposition effect term.
--   (g)$ is the particle phase function.
--   $ is the macroscopic roughness correction.
+
+- $\mu_0$ and $\mu$ are effective cosines of incidence/emission angles after roughness correction.
+- (g)$ is the opposition effect term.
+- (g)$ is the particle phase function.
+- $ is the macroscopic roughness correction.
 
 The term /(4\pi)$ appearing as an additional divisor in the `refmod.hapke.imsa.imsa` code (`refl /= 4*np.pi`) is unusual compared to standard Hapke formulations (where the /(4\pi)$ is typically at the beginning of the /(4\pi)$ term). This might be a specific normalization or convention in this IMSA variant.
 
 ## Inversion Focus
 
 The name "Inversion of Multiple Scattering and Absorption" suggests that this model might be structured or simplified in a way that is particularly amenable to inversion algorithms (e.g., iterative fitting to find $, phase function parameters, etc., from measured reflectance data). However, the provided code is a forward model.
-
-## References
-
--   A specific primary reference for the IMSA model variant implemented in `refmod` should be identified. For now, we use **[IMSAModelPlaceholder]**.
--   Hapke, B. (1993). *Theory of Reflectance and Emittance Spectroscopy*. Cambridge University Press. (For general Hapke theory).
--   See also [references.md](references.md).
