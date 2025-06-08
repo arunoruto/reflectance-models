@@ -9,20 +9,20 @@ refmod.hapke.imsa
 Module Contents
 ---------------
 
-.. py:function:: imsa(incidence_direction, emission_direction, surface_orientation, single_scattering_albedo, phase_function, opposition_effect_h = 0, oppoistion_effect_b0 = 0, roughness = 0)
+.. py:function:: imsa(single_scattering_albedo, incidence_direction, emission_direction, surface_orientation, phase_function, opposition_effect_h = 0, oppoistion_effect_b0 = 0, roughness = 0)
 
    Calculates reflectance using the IMSA model.
 
    IMSA stands for Inversion of Multiple Scattering and Absorption.
 
+   :param single_scattering_albedo: Single scattering albedo, shape (...).
+   :type single_scattering_albedo: npt.NDArray
    :param incidence_direction: Incidence direction vector(s), shape (..., 3).
    :type incidence_direction: npt.NDArray
    :param emission_direction: Emission direction vector(s), shape (..., 3).
    :type emission_direction: npt.NDArray
    :param surface_orientation: Surface normal vector(s), shape (..., 3).
    :type surface_orientation: npt.NDArray
-   :param single_scattering_albedo: Single scattering albedo, shape (...).
-   :type single_scattering_albedo: npt.NDArray
    :param phase_function: Callable that accepts `cos_alpha` (cosine of phase angle) and
                           returns phase function values.
    :type phase_function: Callable[[npt.NDArray], npt.NDArray]

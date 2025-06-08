@@ -13,9 +13,7 @@ Submodules
    /autoapi/refmod/hapke/amsa/index
    /autoapi/refmod/hapke/functions/index
    /autoapi/refmod/hapke/imsa/index
-   /autoapi/refmod/hapke/legendre/index
    /autoapi/refmod/hapke/mimsa/index
-   /autoapi/refmod/hapke/roughness/index
 
 
 
@@ -25,18 +23,18 @@ Submodules
 Package Contents
 ----------------
 
-.. py:function:: amsa(incidence_direction, emission_direction, surface_orientation, single_scattering_albedo, phase_function_type, b_n, a_n, hs = 0, bs0 = 0, roughness = 0, hc = 0, bc0 = 0, phase_function_args = (), refl_optimization = None)
+.. py:function:: amsa(single_scattering_albedo, incidence_direction, emission_direction, surface_orientation, phase_function_type, b_n = None, a_n = None, hs = 0, bs0 = 0, roughness = 0, hc = 0, bc0 = 0, phase_function_args = (), refl_optimization = None)
 
    Calculates the reflectance using the AMSA model.
 
+   :param single_scattering_albedo: Single scattering albedo.
+   :type single_scattering_albedo: npt.NDArray
    :param incidence_direction: Incidence direction vector(s) of shape (..., 3).
    :type incidence_direction: npt.NDArray
    :param emission_direction: Emission direction vector(s) of shape (..., 3).
    :type emission_direction: npt.NDArray
    :param surface_orientation: Surface orientation vector(s) of shape (..., 3).
    :type surface_orientation: npt.NDArray
-   :param single_scattering_albedo: Single scattering albedo.
-   :type single_scattering_albedo: npt.NDArray
    :param phase_function_type: Type of phase function to use.
    :type phase_function_type: PhaseFunctionType
    :param b_n: Coefficients of the Legendre expansion.
@@ -67,35 +65,20 @@ Package Contents
    :raises [AMSAModelPlaceholder]:
 
 
-.. py:function:: double_henyey_greenstein(cos_g, b = 0.21, c = 0.7)
-
-   Calculates the Double Henyey-Greenstein phase function.
-
-   :param cos_g: Cosine of the scattering angle (g).
-   :type cos_g: npt.NDArray
-   :param b: Asymmetry parameter, by default 0.21.
-   :type b: float, optional
-   :param c: Backscatter fraction, by default 0.7.
-   :type c: float, optional
-
-   :returns: Phase function values.
-   :rtype: npt.NDArray
-
-
-.. py:function:: imsa(incidence_direction, emission_direction, surface_orientation, single_scattering_albedo, phase_function, opposition_effect_h = 0, oppoistion_effect_b0 = 0, roughness = 0)
+.. py:function:: imsa(single_scattering_albedo, incidence_direction, emission_direction, surface_orientation, phase_function, opposition_effect_h = 0, oppoistion_effect_b0 = 0, roughness = 0)
 
    Calculates reflectance using the IMSA model.
 
    IMSA stands for Inversion of Multiple Scattering and Absorption.
 
+   :param single_scattering_albedo: Single scattering albedo, shape (...).
+   :type single_scattering_albedo: npt.NDArray
    :param incidence_direction: Incidence direction vector(s), shape (..., 3).
    :type incidence_direction: npt.NDArray
    :param emission_direction: Emission direction vector(s), shape (..., 3).
    :type emission_direction: npt.NDArray
    :param surface_orientation: Surface normal vector(s), shape (..., 3).
    :type surface_orientation: npt.NDArray
-   :param single_scattering_albedo: Single scattering albedo, shape (...).
-   :type single_scattering_albedo: npt.NDArray
    :param phase_function: Callable that accepts `cos_alpha` (cosine of phase angle) and
                           returns phase function values.
    :type phase_function: Callable[[npt.NDArray], npt.NDArray]
@@ -127,35 +110,138 @@ Package Contents
    [IMSAModelPlaceholder]
 
 
-.. py:class:: Hapke(incidence_direction, emission_direction, surface_orientation, single_scattering_albedo, phase_function, opposition_effect_h = 0, oppoistion_effect_b0 = 0, roughness = 0)
-
-   .. py:attribute:: sun
-
-
-   .. py:attribute:: cam
-
-
-   .. py:attribute:: normal
-
-
-   .. py:attribute:: w
-
-
-   .. py:attribute:: p
-
-
-   .. py:attribute:: h
-      :value: 0
+.. py:class:: Hapke(/, **data)
 
 
 
-   .. py:attribute:: b0
-      :value: 0
+   !!! abstract "Usage Documentation"
+       [Models](../concepts/models.md)
+
+   A base class for creating Pydantic models.
+
+   .. attribute:: __class_vars__
+
+      The names of the class variables defined on the model.
+
+   .. attribute:: __private_attributes__
+
+      Metadata about the private attributes of the model.
+
+   .. attribute:: __signature__
+
+      The synthesized `__init__` [`Signature`][inspect.Signature] of the model.
+
+   .. attribute:: __pydantic_complete__
+
+      Whether model building is completed, or if there are still undefined fields.
+
+   .. attribute:: __pydantic_core_schema__
+
+      The core schema of the model.
+
+   .. attribute:: __pydantic_custom_init__
+
+      Whether the model has a custom `__init__` function.
+
+   .. attribute:: __pydantic_decorators__
+
+      Metadata containing the decorators defined on the model.
+      This replaces `Model.__validators__` and `Model.__root_validators__` from Pydantic V1.
+
+   .. attribute:: __pydantic_generic_metadata__
+
+      Metadata for generic models; contains data used for a similar purpose to
+      __args__, __origin__, __parameters__ in typing-module generics. May eventually be replaced by these.
+
+   .. attribute:: __pydantic_parent_namespace__
+
+      Parent namespace of the model, used for automatic rebuilding of models.
+
+   .. attribute:: __pydantic_post_init__
+
+      The name of the post-init method for the model, if defined.
+
+   .. attribute:: __pydantic_root_model__
+
+      Whether the model is a [`RootModel`][pydantic.root_model.RootModel].
+
+   .. attribute:: __pydantic_serializer__
+
+      The `pydantic-core` `SchemaSerializer` used to dump instances of the model.
+
+   .. attribute:: __pydantic_validator__
+
+      The `pydantic-core` `SchemaValidator` used to validate instances of the model.
+
+   .. attribute:: __pydantic_fields__
+
+      A dictionary of field names and their corresponding [`FieldInfo`][pydantic.fields.FieldInfo] objects.
+
+   .. attribute:: __pydantic_computed_fields__
+
+      A dictionary of computed field names and their corresponding [`ComputedFieldInfo`][pydantic.fields.ComputedFieldInfo] objects.
+
+   .. attribute:: __pydantic_extra__
+
+      A dictionary containing extra values, if [`extra`][pydantic.config.ConfigDict.extra]
+      is set to `'allow'`.
+
+   .. attribute:: __pydantic_fields_set__
+
+      The names of fields explicitly set during instantiation.
+
+   .. attribute:: __pydantic_private__
+
+      Values of private attributes set on the model instance.
+
+   Create a new model by parsing and validating input data from keyword arguments.
+
+   Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
+   validated to form a valid model.
+
+   `self` is explicitly positional-only to allow `self` as a field name.
+
+
+   .. py:attribute:: single_scattering_albedo
+      :type:  numpy.typing.NDArray
+
+
+   .. py:attribute:: incidence_direction
+      :type:  numpy.typing.NDArray
+
+
+   .. py:attribute:: emission_direction
+      :type:  numpy.typing.NDArray
+
+
+   .. py:attribute:: surface_orientation
+      :type:  numpy.typing.NDArray
+
+
+   .. py:attribute:: phase_function
+      :type:  Callable[[numpy.typing.NDArray], numpy.typing.NDArray]
+
+
+   .. py:attribute:: opposition_effect_h
+      :type:  float
+      :value: None
 
 
 
-   .. py:attribute:: tb
-      :value: 0
+   .. py:attribute:: oppoistion_effect_b0
+      :type:  float
+      :value: None
 
+
+
+   .. py:attribute:: roughness
+      :type:  float
+      :value: None
+
+
+
+   .. py:attribute:: model_config
+
+      Configuration for the model, should be a dictionary conforming to [`ConfigDict`][pydantic.config.ConfigDict].
 
 

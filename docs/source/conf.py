@@ -31,6 +31,7 @@ extensions = [
     "myst_parser",  # For using Markdown files
     "sphinx_copybutton",  # For adding a copy button to code blocks
     "sphinxcontrib.bibtex",  # For bibliography/citations
+    "sphinxcontrib.autodoc_pydantic",
 ]
 
 templates_path = ["_templates"]

@@ -9,7 +9,7 @@ refmod.hapke.amsa
 Module Contents
 ---------------
 
-.. py:function:: __amsa_preprocess(single_scattering_albedo, incidence_direction, emission_direction, surface_orientation, phase_function_type, b_n, a_n, roughness = 0.0, hs = 0.0, bs0 = 0.0, hc = 0.0, bc0 = 0.0, phase_function_args = ())
+.. py:function:: __amsa_preprocess(single_scattering_albedo, incidence_direction, emission_direction, surface_orientation, phase_function_type, b_n = None, a_n = None, roughness = 0.0, hs = 0.0, bs0 = 0.0, hc = 0.0, bc0 = 0.0, phase_function_args = ())
 
    Preprocesses the inputs for the AMSA model.
 
@@ -66,18 +66,18 @@ Module Contents
    :rtype: tuple
 
 
-.. py:function:: amsa(incidence_direction, emission_direction, surface_orientation, single_scattering_albedo, phase_function_type, b_n, a_n, hs = 0, bs0 = 0, roughness = 0, hc = 0, bc0 = 0, phase_function_args = (), refl_optimization = None)
+.. py:function:: amsa(single_scattering_albedo, incidence_direction, emission_direction, surface_orientation, phase_function_type, b_n = None, a_n = None, hs = 0, bs0 = 0, roughness = 0, hc = 0, bc0 = 0, phase_function_args = (), refl_optimization = None)
 
    Calculates the reflectance using the AMSA model.
 
+   :param single_scattering_albedo: Single scattering albedo.
+   :type single_scattering_albedo: npt.NDArray
    :param incidence_direction: Incidence direction vector(s) of shape (..., 3).
    :type incidence_direction: npt.NDArray
    :param emission_direction: Emission direction vector(s) of shape (..., 3).
    :type emission_direction: npt.NDArray
    :param surface_orientation: Surface orientation vector(s) of shape (..., 3).
    :type surface_orientation: npt.NDArray
-   :param single_scattering_albedo: Single scattering albedo.
-   :type single_scattering_albedo: npt.NDArray
    :param phase_function_type: Type of phase function to use.
    :type phase_function_type: PhaseFunctionType
    :param b_n: Coefficients of the Legendre expansion.
@@ -108,7 +108,7 @@ Module Contents
    :raises [AMSAModelPlaceholder]:
 
 
-.. py:function:: amsa_derivative(single_scattering_albedo, incidence_direction, emission_direction, surface_orientation, phase_function_type, b_n, a_n, roughness = 0, hs = 0, bs0 = 0, hc = 0, bc0 = 0, phase_function_args = (), refl_optimization = None)
+.. py:function:: amsa_derivative(single_scattering_albedo, incidence_direction, emission_direction, surface_orientation, phase_function_type, b_n = None, a_n = None, roughness = 0, hs = 0, bs0 = 0, hc = 0, bc0 = 0, phase_function_args = (), refl_optimization = None)
 
    Calculates the derivative of the reflectance using the AMSA model.
 
