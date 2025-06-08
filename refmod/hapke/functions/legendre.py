@@ -9,11 +9,8 @@ anisotropic scattering and phase functions.
     Hapke (2002)
 """
 
-from typing import Callable
-
 import numpy as np
 import numpy.typing as npt
-from scipy.special import eval_legendre
 
 
 def coef_a(n: int = 15) -> npt.NDArray:
@@ -38,8 +35,9 @@ def coef_a(n: int = 15) -> npt.NDArray:
     Hapke (2002, Eq. 27).
     """
     a_n = np.zeros(n + 1)
-    range_n = np.arange(n)  # Corrected variable name for clarity
-    a_n[1:] = -1 * eval_legendre(range_n, 0) / (range_n + 2)
+    a_n[1] = -0.5
+    for i in range(3, n + 1, 2):
+        a_n[i] = (2 - i) / (i + 1) * a_n[i - 2]
     return a_n
 
 
@@ -85,12 +83,14 @@ def coef_b(b: float = 0.21, c: float = 0.7, n: int = 15) -> npt.NDArray:
         range_n = np.arange(n + 1)  # Corrected variable name
         b_n = c * (2 * range_n + 1) * np.power(b, range_n)
         # TODO: why is the first element one and not c?
-        b_n[0] = 1
+        # b_n[0] = 1
     return b_n
 
 
 def function_p(
-    x: npt.NDArray, b_n: npt.NDArray, a_n: npt.NDArray = np.empty(1) * np.nan
+    x: npt.NDArray,
+    b_n: npt.NDArray | None = None,
+    a_n: npt.NDArray | None = None,
 ) -> npt.NDArray:
     """Calculates the P function from Hapke's model.
 
@@ -105,8 +105,8 @@ def function_p(
     b_n : npt.NDArray
         Array of 'b_n' coefficients.
     a_n : npt.NDArray, optional
-        Array of 'a_n' coefficients. If not provided or NaN, they are
-        calculated using `coef_a(b_n.size)`, by default `np.empty(1) * np.nan`.
+        Array of 'a_n' coefficients. If not provided or `None`, they are
+        calculated using `coef_a(b_n.size)`, by default `None`.
 
     Returns
     -------
@@ -117,15 +117,28 @@ def function_p(
     ----------
     Hapke (2002, Eqs. 23, 24).
     """
-    n_coeffs = np.arange(b_n.size)
-    if np.any(np.isnan(a_n)):
-        a_n = coef_a(b_n.size -1) # Corrected size for coef_a
-    x_expanded = np.expand_dims(x, axis=-1) # Ensure x is broadcastable
-    legendre_terms = eval_legendre(n_coeffs, x_expanded)
-    return 1 + np.sum(a_n * b_n * legendre_terms, axis=-1)
+    if b_n is None:
+        return np.ones_like(x)  # P = 1 if no b_n coefficients are provided
+    if a_n is None:
+        a_n = coef_a(b_n.size - 1)  # Corrected size for coef_a
+
+    p_n_2 = np.zeros_like(x) * x + 1
+    p_n_1 = np.ones_like(x) * x
+    p_n = np.empty_like(x)
+    res = a_n[0] * b_n[0] + x * a_n[1] * b_n[1]
+    for i in range(2, b_n.shape[0]):
+        p_n = (2 - 1 / i) * x * p_n_1 - (1 - 1 / i) * p_n_2
+        res += p_n * a_n[i] * b_n[i]
+        p_n_2 = p_n_1
+        p_n_1 = p_n
+    res += 1
+    return res
 
 
-def value_p(b_n: npt.NDArray, a_n: npt.NDArray = np.empty(1) * np.nan) -> float:
+def value_p(
+    b_n: npt.NDArray | None,
+    a_n: npt.NDArray | None = None,
+) -> float | np.floating:
     """Calculates the scalar value P from Hapke's model.
 
     This value is used in the expression for single particle phase function.
@@ -136,8 +149,8 @@ def value_p(b_n: npt.NDArray, a_n: npt.NDArray = np.empty(1) * np.nan) -> float:
     b_n : npt.NDArray
         Array of 'b_n' coefficients.
     a_n : npt.NDArray, optional
-        Array of 'a_n' coefficients. If not provided or NaN, they are
-        calculated using `coef_a(b_n.size)`, by default `np.empty(1) * np.nan`.
+        Array of 'a_n' coefficients. If not provided or `None`, they are
+        calculated using `coef_a(b_n.size)`, by default `None`.
 
     Returns
     -------
@@ -148,6 +161,8 @@ def value_p(b_n: npt.NDArray, a_n: npt.NDArray = np.empty(1) * np.nan) -> float:
     ----------
     Hapke (2002, Eq. 25).
     """
-    if np.any(np.isnan(a_n)):
-        a_n = coef_a(b_n.size - 1) # Corrected size for coef_a
-    return 1 + np.sum(a_n**2 * b_n)
+    if b_n is None:
+        return 1.0
+    if a_n is None:
+        a_n = coef_a(b_n.size - 1)  # Corrected size for coef_a
+    return 1.0 + np.sum(a_n**2 * b_n)

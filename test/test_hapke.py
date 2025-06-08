@@ -1,10 +1,8 @@
 import numpy as np
 from astropy.io import fits
 from refmod.dtm_helper import dtm2grad
-from refmod.hapke import double_henyey_greenstein
-from refmod.hapke.amsa import amsa
-from refmod.hapke.imsa import imsa
-from refmod.hapke.legendre import coef_a, coef_b
+from refmod.hapke.functions.legendre import coef_a, coef_b
+from refmod.hapke.models import amsa, imsa
 
 DATA_DIR = "test/data"
 EXTENSION = "fits"
@@ -37,10 +35,21 @@ def test_imsa_hopper():
     i = np.tile(i, (u, v, 1))
     e = np.tile(e, (u, v, 1))
 
-    refl = imsa(i, e, n, albedo, lambda x: double_henyey_greenstein(x, b, c), h, b0, tb)
+    refl = imsa(
+        single_scattering_albedo=albedo,
+        incidence_direction=i,
+        emission_direction=e,
+        surface_orientation=n,
+        phase_function_type="dhg",
+        roughness=tb,
+        opposition_effect_h=h,
+        opposition_effect_b0=b0,
+        phase_function_args=(b, c),
+        h_level=1,
+    )
     result[np.isnan(refl)] = np.nan
-    np.testing.assert_allclose(refl, result)
-    # np.testing.assert_allclose(refl, result, rtol=1e-20)
+
+    np.testing.assert_allclose(refl, result * 4 * np.pi)
 
 
 def test_amsa_hopper():
@@ -63,7 +72,8 @@ def test_amsa_hopper():
 
     n = dtm2grad(dtm, resolution, normalize=False)
 
-    u, v = result.shape
+    u = result.shape[0]
+    v = result.shape[1]
 
     i = np.reshape([np.sin(i), 0, np.cos(i)], [1, 1, -1])
     e = np.reshape([np.sin(e), 0, np.cos(e)], [1, 1, -1])
@@ -74,17 +84,16 @@ def test_amsa_hopper():
     b_n = coef_b(b, c)
 
     refl = amsa(
+        albedo,
         i,
         e,
         n,
-        albedo,
-        # lambda x: double_henyey_greenstein(x, b, c),
         "dhg",
         b_n,
         a_n,
+        tb,
         hs,
         bs0,
-        tb,
         hc,
         bc0,
         (b, c),
