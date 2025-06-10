@@ -141,6 +141,7 @@
                     "${package-name}" = [
                       "test"
                       "docs"
+                      "lumba"
                     ];
                   }
                 );

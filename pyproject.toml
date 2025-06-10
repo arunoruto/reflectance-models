@@ -8,13 +8,13 @@ readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = ["numpy>=2.1", "pydantic>=2.11.5", "scipy>=1.15.3"]
 [project.optional-dependencies]
-jax = [
-  "jax>=0.6.1",
-  "optimistix>=0.0.10",
-  "jaxtyping>=0.3.2",
-  # "jax-cuda12-plugin>=0.6.1",
-]
-numba = ["numba>=0.61.0"]
+lumba = ["numba>=0.61.0"]
+# jax = [
+#   "jax>=0.6.1",
+#   "optimistix>=0.0.10",
+#   "jaxtyping>=0.3.2",
+#   # "jax-cuda12-plugin>=0.6.1",
+# ]
 
 [dependency-groups]
 test = [
