@@ -1,15 +1,9 @@
-"""
-??? info "References"
-
-    1. Cornette and Shanks (1992). Bidirectional reflectance
-    of flat, optically thick particulate systems. Applied Optics, 31(15),
-    3152-3160. <https://doi.org/10.1364/AO.31.003152>
-"""
-
 from typing import Literal
 
 import numpy as np
 import numpy.typing as npt
+from numba import float64, jit, vectorize
+from refmod.config import cache
 
 PhaseFunctionType = Literal[
     "dhg",
@@ -20,6 +14,7 @@ PhaseFunctionType = Literal[
 ]
 
 
+@vectorize([float64(float64, float64, float64)], target="cpu", cache=cache)
 def double_henyey_greenstein(
     cos_g: npt.NDArray, b: float = 0.21, c: float = 0.7
 ) -> npt.NDArray:
@@ -47,6 +42,7 @@ def double_henyey_greenstein(
     )
 
 
+@vectorize([float64(float64, float64)], target="cpu", cache=cache)
 def cornette_shanks(cos_g: npt.NDArray, xi: float) -> npt.NDArray:
     """Calculates the Cornette-Shanks phase function.
 
@@ -77,6 +73,7 @@ def cornette_shanks(cos_g: npt.NDArray, xi: float) -> npt.NDArray:
     )
 
 
+@jit(nogil=True, fastmath=True, cache=cache)
 def phase_function(
     cos_g: npt.NDArray,
     type: PhaseFunctionType,

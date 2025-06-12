@@ -1,8 +1,11 @@
 import numpy as np
 import numpy.typing as npt
+from numba import jit
+from refmod.config import cache
 
 
-def normalize(x: npt.NDArray, axis: int = -1) -> npt.NDArray:
+@jit(nogil=True, fastmath=True, cache=cache)
+def normalize(x: npt.NDArray, axis: int = 0) -> npt.NDArray:
     """Normalizes a vector or a batch of vectors.
 
     Calculates the L2 norm (Euclidean norm) of the input array along the
@@ -28,7 +31,8 @@ def normalize(x: npt.NDArray, axis: int = -1) -> npt.NDArray:
     return np.sqrt(temp)
 
 
-def normalize_keepdims(x: npt.NDArray, axis: int = -1) -> npt.NDArray:
+@jit(nogil=True, fastmath=True, cache=cache)
+def normalize_keepdims(x: npt.NDArray, axis: int = 0) -> npt.NDArray:
     """Normalizes a vector or batch of vectors, keeping dimensions.
 
     Calculates the L2 norm of the input array along the specified axis,
@@ -56,8 +60,9 @@ def normalize_keepdims(x: npt.NDArray, axis: int = -1) -> npt.NDArray:
     return np.expand_dims(temp, axis=axis)
 
 
+@jit(nogil=True, fastmath=True, cache=cache)
 def angle_processing_base(
-    vec_a: npt.NDArray, vec_b: npt.NDArray, axis: int = -1
+    vec_a: npt.NDArray, vec_b: npt.NDArray, axis: int = 0
 ) -> tuple[npt.NDArray, npt.NDArray]:
     """Computes cosine and sine of the angle between two vectors.
 
@@ -87,8 +92,9 @@ def angle_processing_base(
     return cos_phi, sin_phi
 
 
+@jit(nogil=True, fastmath=True, cache=cache)
 def angle_processing(
-    vec_a: npt.NDArray, vec_b: npt.NDArray, axis: int = -1
+    vec_a: npt.NDArray, vec_b: npt.NDArray, axis: int = 0
 ) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
     """Computes various trigonometric quantities related to the angle between two vectors.
 

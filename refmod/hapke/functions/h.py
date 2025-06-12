@@ -1,7 +1,10 @@
 import numpy as np
 import numpy.typing as npt
+from numba import float64, jit, vectorize
+from refmod.config import cache
 
 
+@vectorize([float64(float64, float64)], target="cpu", cache=cache)
 def h_function_1(x: npt.NDArray, w: npt.NDArray) -> npt.NDArray:
     """Calculates the H-function (level 1).
 
@@ -26,6 +29,7 @@ def h_function_1(x: npt.NDArray, w: npt.NDArray) -> npt.NDArray:
     return (1 + 2 * x) / (1 + 2 * x * gamma)
 
 
+@vectorize([float64(float64, float64)], target="cpu", cache=cache)
 def h_function_2(x: npt.NDArray, w: npt.NDArray) -> npt.NDArray:
     """Calculates the H-function (level 2).
 
@@ -52,6 +56,7 @@ def h_function_2(x: npt.NDArray, w: npt.NDArray) -> npt.NDArray:
     return 1 / h_inv
 
 
+@vectorize([float64(float64, float64)], target="cpu", cache=cache)
 def h_function_2_derivative(x: npt.NDArray, w: npt.NDArray) -> npt.NDArray:
     """Calculates the derivative of the H-function (level 2) with respect to w.
 
@@ -81,6 +86,7 @@ def h_function_2_derivative(x: npt.NDArray, w: npt.NDArray) -> npt.NDArray:
     )
 
 
+@jit(nogil=True, fastmath=True, cache=cache)
 def h_function(x: npt.NDArray, w: npt.NDArray, level: int = 1) -> npt.NDArray:
     """Calculates the Hapke H-function.
 
@@ -109,6 +115,10 @@ def h_function(x: npt.NDArray, w: npt.NDArray, level: int = 1) -> npt.NDArray:
         If an invalid level (not 1 or 2) is provided.
     """
 
+    # if w.ndim == x.ndim + 1:
+    #     # x = np.broadcast_to(x, w.shape)
+    #     x = np.expand_dims(x, axis=-1)
+
     match level:
         case 1:
             h = h_function_1(x, w)
@@ -120,6 +130,7 @@ def h_function(x: npt.NDArray, w: npt.NDArray, level: int = 1) -> npt.NDArray:
     return h
 
 
+@jit(nogil=True, fastmath=True, cache=cache)
 def h_function_derivative(
     x: npt.NDArray, w: npt.NDArray, level: int = 1
 ) -> npt.NDArray:

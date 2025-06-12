@@ -1,12 +1,19 @@
 import numpy as np
 import numpy.typing as npt
-from refmod.hapke.functions.h import h_function, h_function_2, h_function_2_derivative
+from numba import jit
+from refmod.config import cache
+from refmod.hapke.functions.h import h_function, h_function_derivative
 from refmod.hapke.functions.legendre import function_p, value_p
+from refmod.hapke.functions.opposition_effect import (
+    coherant_backscattering,
+    shadow_hiding,
+)
 from refmod.hapke.functions.phase import PhaseFunctionType, phase_function
 from refmod.hapke.functions.roughness import microscopic_roughness
 from refmod.hapke.functions.vectors import angle_processing_base, normalize_keepdims
 
 
+@jit(nogil=True, fastmath=True, cache=cache)
 def __amsa_preprocess(
     single_scattering_albedo: npt.NDArray,
     incidence_direction: npt.NDArray,
@@ -81,9 +88,9 @@ def __amsa_preprocess(
                 H-function values for mu.
     """
     # Angles
-    incidence_direction /= normalize_keepdims(incidence_direction)
-    emission_direction /= normalize_keepdims(emission_direction)
-    surface_orientation /= normalize_keepdims(surface_orientation)
+    incidence_direction /= normalize_keepdims(incidence_direction, 0)
+    emission_direction /= normalize_keepdims(emission_direction, 0)
+    surface_orientation /= normalize_keepdims(surface_orientation, 0)
 
     # Roughness
     s, mu_0, mu = microscopic_roughness(
@@ -94,6 +101,7 @@ def __amsa_preprocess(
     cos_alpha, sin_alpha = angle_processing_base(
         incidence_direction,
         emission_direction,
+        0,
     )
     tan_alpha_2 = sin_alpha / (1 + cos_alpha)
 
@@ -107,32 +115,32 @@ def __amsa_preprocess(
 
     if b_n is None:
         # If the Legendre terms are not used, the model reduces to IMSA
-        p_mu_0 = 1.0
-        p_mu = 1.0
+        p_mu_0 = np.ones_like(h_mu_0)
+        p_mu = np.ones_like(h_mu)
         p = 1.0
         m = h_mu_0 * h_mu - 1
     else:
         # Legendre
-        p_mu_0 = function_p(mu_0, b_n, a_n)
-        p_mu = function_p(mu, b_n, a_n)
+        p_mu_0 = np.asarray(function_p(mu_0, b_n, a_n))
+        p_mu = np.asarray(function_p(mu, b_n, a_n))
         p = value_p(b_n, a_n)
 
         # M term
         m = p_mu_0 * (h_mu - 1) + p_mu * (h_mu_0 - 1) + p * (h_mu_0 - 1) * (h_mu - 1)
 
     ## If the following two terms are ignored, we get the MIMSA model
-    # Shadow-hiding effect
-    b_sh = np.ones_like(tan_alpha_2)
-    if (shadow_hiding_b0 != 0) and (shadow_hiding_h != 0):
-        b_sh += shadow_hiding_b0 / (1 + tan_alpha_2 / shadow_hiding_h)
+    b_sh = shadow_hiding(
+        tan_alpha_2,
+        shadow_hiding_h,
+        shadow_hiding_b0,
+    )
     p_g *= b_sh
 
-    # Coherent backscattering effect
-    b_cb = np.ones_like(tan_alpha_2)
-    if (coherant_backscattering_b0 != 0) and (coherant_backscattering_h != 0):
-        hc_2 = tan_alpha_2 / coherant_backscattering_h
-        bc = 0.5 * (1 + (1 - np.exp(-hc_2)) / hc_2) / (1 + hc_2) ** 2
-        b_cb += coherant_backscattering_b0 * bc
+    b_cb = coherant_backscattering(
+        tan_alpha_2,
+        coherant_backscattering_h,
+        coherant_backscattering_b0,
+    )
 
     ## Merging into result
     albedo_independent = mu_0 / (mu_0 + mu) * s / (4 * np.pi) * b_cb
@@ -149,6 +157,162 @@ def __amsa_preprocess(
         h_mu_0,
         h_mu,
     )
+
+
+@jit(nogil=True, fastmath=True, cache=cache)
+def __amsa_scalar(
+    single_scattering_albedo: npt.NDArray,
+    incidence_direction: npt.NDArray,
+    emission_direction: npt.NDArray,
+    surface_orientation: npt.NDArray,
+    phase_function_type: PhaseFunctionType = "dhg",
+    b_n: npt.NDArray | None = None,
+    a_n: npt.NDArray | None = None,
+    roughness: float = 0,
+    shadow_hiding_h: float = 0.0,
+    shadow_hiding_b0: float = 0.0,
+    coherant_backscattering_h: float = 0.0,
+    coherant_backscattering_b0: float = 0.0,
+    phase_function_args: tuple = (),
+    refl_optimization: npt.NDArray | None = None,
+    h_level: int = 2,
+) -> npt.NDArray:
+    """Calculates the reflectance using the AMSA model.
+
+    Parameters
+    ----------
+
+    single_scattering_albedo : npt.NDArray
+        Single scattering albedo.
+    incidence_direction : npt.NDArray
+        Incidence direction vector(s) of shape (..., 3).
+    emission_direction : npt.NDArray
+        Emission direction vector(s) of shape (..., 3).
+    surface_orientation : npt.NDArray
+        Surface orientation vector(s) of shape (..., 3).
+    phase_function_type : PhaseFunctionType
+        Type of phase function to use.
+    b_n : npt.NDArray
+        Coefficients of the Legendre expansion.
+    a_n : npt.NDArray
+        Coefficients of the Legendre expansion.
+    roughness : float, optional
+        Surface roughness, by default 0.
+    shadow_hiding_h : float, optional
+        Shadowing parameter, by default 0.
+    shadow_hiding_b0 : float, optional
+        Shadowing parameter, by default 0.
+    coherant_backscattering_h : float, optional
+        Coherent backscattering parameter, by default 0.
+    coherant_backscattering_b0 : float, optional
+        Coherent backscattering parameter, by default 0.
+    phase_function_args : tuple, optional
+        Additional arguments for the phase function, by default ().
+    refl_optimization : npt.NDArray | None, optional
+        Reflectance optimization array, by default None.
+
+    Returns
+    -------
+    npt.NDArray
+        Reflectance values.
+
+    Raises
+    ------
+    Exception
+        If at least one reflectance value is not real.
+
+    References
+
+    ----------
+
+    [AMSAModelPlaceholder]
+    """
+
+    # refl = np.zeros_like(single_scattering_albedo)
+    # for k in prange(refl.size):
+    #     w = single_scattering_albedo[k]
+    #     i = incidence_direction[:, k]
+    #     e = emission_direction[:, k]
+    #     n = surface_orientation[:, k]
+    #     (
+    #         albedo_independent,
+    #         mu_0,
+    #         mu,
+    #         p_g,
+    #         m,
+    #         _,
+    #         _,
+    #         _,
+    #         _,
+    #         _,
+    #     ) = __amsa_preprocess(
+    #         w,
+    #         i,
+    #         e,
+    #         n,
+    #         phase_function_type,
+    #         b_n,
+    #         a_n,
+    #         roughness,
+    #         shadow_hiding_h,
+    #         shadow_hiding_b0,
+    #         coherant_backscattering_h,
+    #         coherant_backscattering_b0,
+    #         phase_function_args,
+    #         h_level,
+    #     )
+    #     # Reflectance
+    #     # print(np.shape(w), np.shape(p_g))
+    #     refl_k = albedo_independent * w * (p_g + m)
+    #     if (mu <= 0) or (mu_0 <= 0) or (refl_k < 1e-6):
+    #         refl[k] = np.nan
+    #         continue
+    #     refl[k] = refl_k[0]
+
+    (
+        albedo_independent,
+        mu_0,
+        mu,
+        p_g,
+        m,
+        _,
+        _,
+        _,
+        _,
+        _,
+    ) = __amsa_preprocess(
+        single_scattering_albedo,
+        incidence_direction,
+        emission_direction,
+        surface_orientation,
+        phase_function_type,
+        b_n,
+        a_n,
+        roughness,
+        shadow_hiding_h,
+        shadow_hiding_b0,
+        coherant_backscattering_h,
+        coherant_backscattering_b0,
+        phase_function_args,
+        h_level,
+    )
+    # Reflectance
+    refl = albedo_independent * single_scattering_albedo * (p_g + m)
+    refl = np.where((mu <= 0) | (mu_0 <= 0), np.nan, refl)
+    refl = np.where(refl < 1e-6, np.nan, refl)
+
+    # Final result
+    threshold_imag = 0.1
+    threshold_error = 1e-4
+    arg_rh = np.where(np.real(refl) == 0, 0, np.imag(refl) / np.real(refl))
+    refl = np.where(arg_rh > threshold_imag, np.nan, refl)
+
+    if np.any(arg_rh >= threshold_error):
+        raise Exception("At least one reflectance value is not real!")
+
+    if refl_optimization is not None:
+        refl -= refl_optimization
+    return refl
 
 
 def amsa(
@@ -218,18 +382,34 @@ def amsa(
 
     [AMSAModelPlaceholder]
     """
-    (
-        albedo_independent,
-        mu_0,
-        mu,
-        p_g,
-        m,
-        _,
-        _,
-        _,
-        _,
-        _,
-    ) = __amsa_preprocess(
+    original_shape = np.array(single_scattering_albedo.shape)
+    # single_scattering_albedo = np.ascontiguousarray(single_scattering_albedo).reshape(
+    #     -1
+    # )
+    # incidence_direction = np.ascontiguousarray(incidence_direction).reshape(3, -1)
+    # emission_direction = np.ascontiguousarray(emission_direction).reshape(3, -1)
+    # surface_orientation = np.ascontiguousarray(surface_orientation).reshape(3, -1)
+
+    space_shape = surface_orientation.shape[1:]
+    bands_shape = original_shape[: -len(space_shape)]
+
+    incidence_direction = np.tile(
+        np.expand_dims(incidence_direction, axis=1),
+        (1, *bands_shape, 1, 1),
+    ).reshape(3, -1)
+    emission_direction = np.tile(
+        np.expand_dims(emission_direction, axis=1),
+        (1, *bands_shape, 1, 1),
+    ).reshape(3, -1)
+    surface_orientation = np.tile(
+        np.expand_dims(surface_orientation, axis=1),
+        (1, *bands_shape, 1, 1),
+    ).reshape(3, -1)
+    single_scattering_albedo = np.ascontiguousarray(single_scattering_albedo).reshape(
+        -1
+    )
+
+    refl = __amsa_scalar(
         single_scattering_albedo,
         incidence_direction,
         emission_direction,
@@ -243,28 +423,13 @@ def amsa(
         coherant_backscattering_h,
         coherant_backscattering_b0,
         phase_function_args,
+        refl_optimization,
         h_level,
     )
-    # Reflectance
-    refl = albedo_independent * single_scattering_albedo * (p_g + m)
-    refl = np.where((mu <= 0) | (mu_0 <= 0), np.nan, refl)
-    refl = np.where(refl < 1e-6, np.nan, refl)
-
-    # Final result
-    threshold_imag = 0.1
-    threshold_error = 1e-4
-    arg_rh = np.where(np.real(refl) == 0, 0, np.imag(refl) / np.real(refl))
-    refl = np.where(arg_rh > threshold_imag, np.nan, refl)
-
-    if np.any(arg_rh >= threshold_error):
-        raise Exception("At least one reflectance value is not real!")
-
-    if refl_optimization is None:
-        return refl
-    refl -= refl_optimization
-    return refl
+    return refl.reshape(original_shape)
 
 
+# @jit(nogil=True, fastmath=True, cache=cache)
 def amsa_derivative(
     single_scattering_albedo: npt.NDArray,
     incidence_direction: npt.NDArray,
@@ -280,6 +445,7 @@ def amsa_derivative(
     coherant_backscattering_b0: float = 0.0,
     phase_function_args: tuple = (),
     refl_optimization: npt.NDArray | None = None,
+    h_level: int = 2,
 ) -> npt.NDArray:
     """Calculates the derivative of the reflectance using the AMSA model.
 
@@ -354,8 +520,8 @@ def amsa_derivative(
         phase_function_args,
     )
 
-    dh0_dw = h_function_2_derivative(mu_0, single_scattering_albedo)
-    dh_dw = h_function_2_derivative(mu, single_scattering_albedo)
+    dh0_dw = h_function_derivative(mu_0, single_scattering_albedo, h_level)
+    dh_dw = h_function_derivative(mu, single_scattering_albedo, h_level)
 
     # derivative of M term
     dm_dw = (
@@ -369,6 +535,7 @@ def amsa_derivative(
     return dr_dw
 
 
+# @jit(nogil=True, fastmath=True, cache=cache)
 def imsa(
     single_scattering_albedo: npt.NDArray,
     incidence_direction: npt.NDArray,

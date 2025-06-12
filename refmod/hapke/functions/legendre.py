@@ -11,8 +11,11 @@ anisotropic scattering and phase functions.
 
 import numpy as np
 import numpy.typing as npt
+from numba import jit
+from refmod.config import cache
 
 
+@jit(nogil=True, fastmath=True, cache=cache)
 def coef_a(n: int = 15) -> npt.NDArray:
     """Calculates coefficients 'a_n' for Legendre polynomial series.
 
@@ -41,6 +44,7 @@ def coef_a(n: int = 15) -> npt.NDArray:
     return a_n
 
 
+@jit(nogil=True, fastmath=True, cache=cache)
 def coef_b(b: float = 0.21, c: float = 0.7, n: int = 15) -> npt.NDArray:
     """Calculates coefficients 'b_n' for Legendre polynomial expansion.
 
@@ -87,6 +91,7 @@ def coef_b(b: float = 0.21, c: float = 0.7, n: int = 15) -> npt.NDArray:
     return b_n
 
 
+@jit(nogil=True, fastmath=True, cache=cache)
 def function_p(
     x: npt.NDArray,
     b_n: npt.NDArray | None = None,
@@ -118,7 +123,7 @@ def function_p(
     Hapke (2002, Eqs. 23, 24).
     """
     if b_n is None:
-        return np.ones_like(x)  # P = 1 if no b_n coefficients are provided
+        return x * 0 + 1  # P = 1 if no b_n coefficients are provided
     if a_n is None:
         a_n = coef_a(b_n.size - 1)  # Corrected size for coef_a
 
@@ -135,6 +140,7 @@ def function_p(
     return res
 
 
+@jit(nogil=True, fastmath=True, cache=cache)
 def value_p(
     b_n: npt.NDArray | None,
     a_n: npt.NDArray | None = None,

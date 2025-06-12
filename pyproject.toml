@@ -6,15 +6,12 @@ authors = [{ name = "Mirza Arnaut", email = "mirza.arnaut@tu-dortmund.de" }]
 license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
-dependencies = ["numpy>=2.1", "pydantic>=2.11.5", "scipy>=1.15.3"]
-[project.optional-dependencies]
-lumba = ["numba>=0.61.0"]
-# jax = [
-#   "jax>=0.6.1",
-#   "optimistix>=0.0.10",
-#   "jaxtyping>=0.3.2",
-#   # "jax-cuda12-plugin>=0.6.1",
-# ]
+dependencies = [
+  "numpy>=2.1",
+  "numba>=0.61.0",
+  "pydantic>=2.11.5",
+  "scipy>=1.15.3",
+]
 
 [dependency-groups]
 test = [
