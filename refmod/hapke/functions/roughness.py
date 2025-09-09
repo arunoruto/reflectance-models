@@ -285,7 +285,7 @@ def microscopic_roughness(
         s[:] = 1.0
         cos_i_s[:] = cos_i
         cos_e_s[:] = cos_e
-        print("Roughness is zero, returning default values")
+        # print("Roughness is zero, returning default values")
         return
 
     # Projections
