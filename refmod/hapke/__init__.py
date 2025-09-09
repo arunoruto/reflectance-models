@@ -84,7 +84,11 @@ class Hapke(BaseModel):
                 h_level=self.h_level,
             )
 
-    def albedo(self, reflectance: npt.NDArray) -> npt.NDArray:
+    def albedo(
+        self,
+        reflectance: npt.NDArray,
+        least_squares_param: dict = {},
+    ) -> npt.NDArray:
         if self.model != "amsa":
             raise ValueError(
                 "Albedo inversion is only implemented for the 'amsa' model."
@@ -142,6 +146,7 @@ class Hapke(BaseModel):
                 refl_optimization=reflectance,
                 h_level=self.h_level,
             ),
+            **least_squares_param,
         )
         self.single_scattering_albedo = np.array(albedo_recon.x.reshape(original_shape))
 
