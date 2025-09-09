@@ -9,7 +9,10 @@
 {
   env.GREET = "devenv";
 
-  packages = [ pkgs.git ];
+  packages = with pkgs; [
+    git
+    libz
+  ];
 
   # shell = lib.mkForce pkgs.fish;
 
@@ -20,9 +23,12 @@
   # services.postgres.enable = true;
 
   # https://devenv.sh/scripts/
-  scripts.hello.exec = ''
-    echo hello from $GREET
-  '';
+  scripts = {
+    hello.exec = ''
+      echo hello from $GREET
+    '';
+    pytest.exec = ''uv run pytest "$@"'';
+  };
 
   enterShell = ''
     hello
@@ -54,11 +60,13 @@
       enable = true;
       sync = {
         enable = true;
-        # extras = [ "test" ];
+        groups = [
+          "test"
+          "docs"
+        ];
       };
     };
 
-    # venv.enable = true;
-    # venv.requirements = ./requirements.txt;
+    libraries = [ pkgs.zlib ];
   };
 }
