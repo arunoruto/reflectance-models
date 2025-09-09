@@ -37,7 +37,7 @@ def test_inverse_amsa():
     e = np.tile(e, (1, u, v))
     n = np.moveaxis(n, -1, 0)
 
-    r = 10
+    r = 10 * 1
     uc = u // 2 + np.arange(-r, r)
     vc = v // 2 + np.arange(-r, r)
     albedo = albedo[uc, :][:, vc]

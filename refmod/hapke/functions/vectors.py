@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.typing as npt
-from numba import jit
+from numba import float64, guvectorize, jit
 from refmod.config import cache
 
 
@@ -60,42 +60,42 @@ def normalize_keepdims(x: npt.NDArray, axis: int = 0) -> npt.NDArray:
     return np.expand_dims(temp, axis=axis)
 
 
-@jit(nogil=True, fastmath=True, cache=cache)
-def angle_processing_base(
-    vec_a: npt.NDArray, vec_b: npt.NDArray, axis: int = 0
-) -> tuple[npt.NDArray, npt.NDArray]:
-    """Computes cosine and sine of the angle between two vectors.
+# @jit(nogil=True, fastmath=True, cache=cache)
+# def angle_processing_base(
+#     vec_a: npt.NDArray, vec_b: npt.NDArray, axis: int = 0
+# ) -> tuple[npt.NDArray, npt.NDArray]:
+#     """Computes cosine and sine of the angle between two vectors.
 
-    Parameters
-    ----------
+#     Parameters
+#     ----------
 
-    vec_a : npt.NDArray
-        First vector or batch of vectors.
-    vec_b : npt.NDArray
-        Second vector or batch of vectors. Must have the same shape as vec_a.
-    axis : int, optional
-        Axis along which the dot product is performed, by default -1.
+#     vec_a : npt.NDArray
+#         First vector or batch of vectors.
+#     vec_b : npt.NDArray
+#         Second vector or batch of vectors. Must have the same shape as vec_a.
+#     axis : int, optional
+#         Axis along which the dot product is performed, by default -1.
 
-    Returns
-    -------
-    tuple[npt.NDArray, npt.NDArray]
-        A tuple containing:
-            - cos_phi : npt.NDArray
-                Cosine of the angle(s) between vec_a and vec_b.
-            - sin_phi : npt.NDArray
-                Sine of the angle(s) between vec_a and vec_b.
-    """
-    cos_phi = np.sum(vec_a * vec_b, axis=axis)
-    cos_phi = np.array([cos_phi]) if isinstance(cos_phi, float) else cos_phi
-    cos_phi = np.clip(cos_phi, -1, 1)
-    sin_phi = np.sqrt(1 - cos_phi**2)
-    return cos_phi, sin_phi
+#     Returns
+#     -------
+#     tuple[npt.NDArray, npt.NDArray]
+#         A tuple containing:
+#             - cos_phi : npt.NDArray
+#                 Cosine of the angle(s) between vec_a and vec_b.
+#             - sin_phi : npt.NDArray
+#                 Sine of the angle(s) between vec_a and vec_b.
+#     """
+#     cos_phi = np.sum(vec_a * vec_b, axis=axis)
+#     cos_phi = np.array([cos_phi]) if isinstance(cos_phi, float) else cos_phi
+#     cos_phi = np.clip(cos_phi, -1, 1)
+#     sin_phi = np.sqrt(1 - cos_phi**2)
+#     return cos_phi, sin_phi
 
 
 @jit(nogil=True, fastmath=True, cache=cache)
 def angle_processing(
     vec_a: npt.NDArray, vec_b: npt.NDArray, axis: int = 0
-) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
+) -> npt.NDArray:
     """Computes various trigonometric quantities related to the angle between two vectors.
 
     Parameters
@@ -122,7 +122,27 @@ def angle_processing(
             - i : npt.NDArray
                 The angle(s) in radians between vec_a and vec_b (i.e., arccos(cos_phi)).
     """
-    cos_phi, sin_phi = angle_processing_base(vec_a, vec_b, axis)
-    cot_phi = np.where(sin_phi == 0, np.inf, cos_phi / sin_phi)
-    i = np.arccos(cos_phi)
-    return cos_phi, sin_phi, cot_phi, i
+    cos_phi = np.sum(vec_a * vec_b, axis=axis)
+    cos_phi = np.array([cos_phi]) if isinstance(cos_phi, float) else cos_phi
+    cos_phi = np.clip(cos_phi, -1, 1)
+    return cos_phi
+
+
+# @jit(nogil=True, fastmath=True, cache=cache)
+# def dot0(vec_a: npt.NDArray, vec_b: npt.NDArray):
+@guvectorize(
+    [(float64[:, :], float64[:, :], float64[:])], "(m,n),(m,n)->(n)", cache=cache
+)
+# @guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()", cache=cache)
+def dot0(vec_a: npt.NDArray, vec_b: npt.NDArray, cos_phi: npt.NDArray):
+    for j in range(vec_a.shape[1]):  # Looping over the 'n' dimension
+        sum_val = 0.0
+        for i in range(vec_a.shape[0]):  # Looping over the 'm' dimension (axis 0)
+            sum_val += vec_a[i, j] * vec_b[i, j]
+        cos_phi[j] = np.minimum(np.maximum(sum_val, -1.0), 1.0)
+    # cos_phi = np.sum(vec_a * vec_b, axis=0)
+    # cos_phi = np.asarray(cos_phi)
+    # cos_phi = np.atleast_1d(cos_phi)
+    # cos_phi = np.array([cos_phi]) if isinstance(cos_phi, float) else cos_phi
+    # cos_phi = np.clip(cos_phi, -1.0, 1.0)
+    # return cos_phi

@@ -64,71 +64,28 @@ def inverse_model(
     ).reshape(3, -1)
     refl = refl.reshape(-1)
 
-    # albedo_recon, _, _, _, _ = levenberg_marquardt_core(
-    #     func=__amsa_wrapper,
-    #     p0=np.ones(refl.size) / 3,
-    #     target_y=refl.flatten(),
-    #     args=(
-    #         incidence_direction,
-    #         emission_direction,
-    #         surface_orientation,
-    #         phase_function_type,
-    #         b_n,
-    #         a_n,
-    #         roughness,
-    #         shadow_hiding_h,
-    #         shadow_hiding_b0,
-    #         coherant_backscattering_h,
-    #         coherant_backscattering_b0,
-    #         phase_function_args,
-    #         # refl,
-    #     ),
-    # )
-
-    # return albedo_recon.reshape(original_shape)
-
     albedo_recon = least_squares(
-        lambda w: (
-            amsa(
-                w,
-                incidence_direction,
-                emission_direction,
-                surface_orientation,
-                phase_function_type,
-                b_n,
-                a_n,
-                roughness,
-                shadow_hiding_h,
-                shadow_hiding_b0,
-                coherant_backscattering_h,
-                coherant_backscattering_b0,
-                phase_function_args,
-                refl,
-                h_level=h_level,
-            )
-        ),
+        amsa,
         np.ones_like(refl) / 3,
-        # jac=lambda w: (  # pyright: ignore
-        #     amsa_derivative(
-        #         w,
-        #         incidence_direction,
-        #         emission_direction,
-        #         surface_orientation,
-        #         phase_function_type,
-        #         b_n,
-        #         a_n,
-        #         roughness,
-        #         shadow_hiding_h,
-        #         shadow_hiding_b0,
-        #         coherant_backscattering_h,
-        #         coherant_backscattering_b0,
-        #         phase_function_args,
-        #         # refl,
-        #         h_level=h_level,
-        #     )
-        # ),
+        # jac=amsa_derivative,  # pyright: ignore
         method="lm",
         # verbose=2,
+        kwargs=dict(
+            incidence_direction=incidence_direction,
+            emission_direction=emission_direction,
+            surface_orientation=surface_orientation,
+            phase_function_type=phase_function_type,
+            b_n=b_n,
+            a_n=a_n,
+            roughness=roughness,
+            shadow_hiding_h=shadow_hiding_h,
+            shadow_hiding_b0=shadow_hiding_b0,
+            coherant_backscattering_h=coherant_backscattering_h,
+            coherant_backscattering_b0=coherant_backscattering_b0,
+            phase_function_args=phase_function_args,
+            refl_optimization=refl,
+            h_level=h_level,
+        ),
     )
 
     return albedo_recon.x.reshape(original_shape)

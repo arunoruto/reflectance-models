@@ -10,10 +10,10 @@ from refmod.hapke.functions.opposition_effect import (
 )
 from refmod.hapke.functions.phase import PhaseFunctionType, phase_function
 from refmod.hapke.functions.roughness import microscopic_roughness
-from refmod.hapke.functions.vectors import angle_processing_base, normalize_keepdims
+from refmod.hapke.functions.vectors import angle_processing, dot0, normalize_keepdims
 
 
-@jit(nogil=True, fastmath=True, cache=cache)
+# @jit(nogil=True, fastmath=True, cache=cache)
 def __amsa_preprocess(
     single_scattering_albedo: npt.NDArray,
     incidence_direction: npt.NDArray,
@@ -98,11 +98,8 @@ def __amsa_preprocess(
     )
 
     # Phase angle Alpha
-    cos_alpha, sin_alpha = angle_processing_base(
-        incidence_direction,
-        emission_direction,
-        0,
-    )
+    cos_alpha = angle_processing(incidence_direction, emission_direction)
+    sin_alpha = np.sqrt(1 - cos_alpha**2)
     tan_alpha_2 = sin_alpha / (1 + cos_alpha)
 
     p_g = phase_function(cos_alpha, phase_function_type, phase_function_args)
@@ -159,7 +156,7 @@ def __amsa_preprocess(
     )
 
 
-@jit(nogil=True, fastmath=True, cache=cache)
+# @jit(nogil=True, fastmath=True, cache=cache)
 def __amsa_scalar(
     single_scattering_albedo: npt.NDArray,
     incidence_direction: npt.NDArray,
@@ -228,47 +225,6 @@ def __amsa_scalar(
     [AMSAModelPlaceholder]
     """
 
-    # refl = np.zeros_like(single_scattering_albedo)
-    # for k in prange(refl.size):
-    #     w = single_scattering_albedo[k]
-    #     i = incidence_direction[:, k]
-    #     e = emission_direction[:, k]
-    #     n = surface_orientation[:, k]
-    #     (
-    #         albedo_independent,
-    #         mu_0,
-    #         mu,
-    #         p_g,
-    #         m,
-    #         _,
-    #         _,
-    #         _,
-    #         _,
-    #         _,
-    #     ) = __amsa_preprocess(
-    #         w,
-    #         i,
-    #         e,
-    #         n,
-    #         phase_function_type,
-    #         b_n,
-    #         a_n,
-    #         roughness,
-    #         shadow_hiding_h,
-    #         shadow_hiding_b0,
-    #         coherant_backscattering_h,
-    #         coherant_backscattering_b0,
-    #         phase_function_args,
-    #         h_level,
-    #     )
-    #     # Reflectance
-    #     # print(np.shape(w), np.shape(p_g))
-    #     refl_k = albedo_independent * w * (p_g + m)
-    #     if (mu <= 0) or (mu_0 <= 0) or (refl_k < 1e-6):
-    #         refl[k] = np.nan
-    #         continue
-    #     refl[k] = refl_k[0]
-
     (
         albedo_independent,
         mu_0,
@@ -315,6 +271,7 @@ def __amsa_scalar(
     return refl
 
 
+# @jit(nogil=True, fastmath=True, cache=cache)
 def amsa(
     single_scattering_albedo: npt.NDArray,
     incidence_direction: npt.NDArray,
@@ -393,6 +350,7 @@ def amsa(
     space_shape = surface_orientation.shape[1:]
     bands_shape = original_shape[: -len(space_shape)]
 
+    # TODO: maybe make more axis, like 1+np.arange(len(bands_shape))
     incidence_direction = np.tile(
         np.expand_dims(incidence_direction, axis=1),
         (1, *bands_shape, 1, 1),
@@ -402,7 +360,7 @@ def amsa(
         (1, *bands_shape, 1, 1),
     ).reshape(3, -1)
     surface_orientation = np.tile(
-        np.expand_dims(surface_orientation, axis=1),
+        np.expand_dims(np.ascontiguousarray(surface_orientation), axis=1),
         (1, *bands_shape, 1, 1),
     ).reshape(3, -1)
     single_scattering_albedo = np.ascontiguousarray(single_scattering_albedo).reshape(
