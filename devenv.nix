@@ -63,6 +63,7 @@
         groups = [
           "test"
           "docs"
+          "profiling"
         ];
       };
     };

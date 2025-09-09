@@ -1,3 +1,5 @@
+*.speedscope.json
+
 # Devenv
 .devenv*
 devenv.local.nix
