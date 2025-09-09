@@ -73,21 +73,17 @@ def coef_b(b: float = 0.21, c: float = 0.7, n: int = 15) -> npt.NDArray:
     Notes
     -----
     The calculation method depends on whether `c` is NaN.
-    The first element `b_n[0]` is set to 1 if `c` is not NaN, which differs
-    from the direct formula application for that term.
 
     References
     ----------
     Hapke (2002, p. 530).
     """
     if np.isnan(c):
-        range_n = np.arange(n + 1) + 1  # Corrected variable name
+        range_n = np.arange(n + 1) + 1
         b_n = (2 * range_n + 1) * np.power(-b, range_n)
     else:
-        range_n = np.arange(n + 1)  # Corrected variable name
+        range_n = np.arange(n + 1)
         b_n = c * (2 * range_n + 1) * np.power(b, range_n)
-        # TODO: why is the first element one and not c?
-        # b_n[0] = 1
     return b_n
 
 
