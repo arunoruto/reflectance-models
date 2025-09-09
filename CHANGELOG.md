@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.2.0 (2025-09-09)
+
+### Features
+
+- Implement inversion in the Hapke class
+  ([`8160481`](https://github.com/arunoruto/reflectance-models/commit/81604817a276b5eb3b1bba1e190aa8f55992bb0a))
+
+
 ## v0.1.0 (2025-09-09)
 
 ### Bug Fixes
