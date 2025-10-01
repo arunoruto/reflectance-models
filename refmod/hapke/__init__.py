@@ -7,7 +7,7 @@ from scipy.optimize import least_squares
 
 from .functions.legendre import coef_a, coef_b
 from .functions.phase import PhaseFunctionType
-from .models import amsa, imsa
+from .models import amsa, amsa_scalar, imsa
 
 __all__ = ["amsa", "imsa", "Hapke"]
 
@@ -87,7 +87,7 @@ class Hapke(BaseModel):
     def albedo(
         self,
         reflectance: npt.NDArray,
-        least_squares_param: dict = {},
+        least_squares_param: dict = {"method": "lm"},
     ) -> npt.NDArray:
         if self.model != "amsa":
             raise ValueError(
@@ -125,10 +125,20 @@ class Hapke(BaseModel):
         ).reshape(3, -1)
         reflectance = reflectance.reshape(-1)
 
+        # print(f"""
+        #           {space_shape=}
+        #           {bands_shape=}
+        #           {original_shape=}
+        #           {incidence_direction.shape=}
+        #           {emission_direction.shape=}
+        #           {surface_orientation.shape=}
+        #           {reflectance.shape=}
+        #       """)
+
         albedo_recon = least_squares(
-            amsa,
+            amsa_scalar,
             np.ones_like(reflectance) / 3,
-            method="lm",
+            # method="lm",
             # verbose=2,
             kwargs=dict(
                 incidence_direction=incidence_direction,

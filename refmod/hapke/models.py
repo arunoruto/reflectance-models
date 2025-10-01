@@ -157,7 +157,7 @@ def __amsa_preprocess(
 
 
 # @jit(nogil=True, fastmath=True, cache=cache)
-def __amsa_scalar(
+def amsa_scalar(
     single_scattering_albedo: npt.NDArray,
     incidence_direction: npt.NDArray,
     emission_direction: npt.NDArray,
@@ -349,8 +349,11 @@ def amsa(
 
     space_shape = surface_orientation.shape[1:]
     bands_shape = original_shape[: -len(space_shape)]
+    # print(f"{surface_orientation.shape=}, {bands_shape=}, {space_shape=}")
 
     # TODO: maybe make more axis, like 1+np.arange(len(bands_shape))
+    # TODO: extract the tiling as a separate function -> iprovement for the inverse
+    # TODO: since the data dimensions are collapsed, just use np.prod on bands_shape
     incidence_direction = np.tile(
         np.expand_dims(incidence_direction, axis=1),
         (1, *bands_shape, 1, 1),
@@ -367,7 +370,7 @@ def amsa(
         -1
     )
 
-    refl = __amsa_scalar(
+    refl = amsa_scalar(
         single_scattering_albedo,
         incidence_direction,
         emission_direction,
