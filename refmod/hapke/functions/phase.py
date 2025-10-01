@@ -36,9 +36,12 @@ def double_henyey_greenstein(
         Phase function values.
     """
     return (
-        (1 + c) / 2 * (1 - b**2) / np.power(1 - 2 * b * cos_g + b**2, 1.5)
+        # (1 + c) / 2 * (1 - b**2) / np.power(1 - 2 * b * cos_g + b**2, 1.5)
+        # +  # NOTE: just for formatting
+        # (1 - c) / 2 * (1 - b**2) / np.power(1 + 2 * b * cos_g + b**2, 1.5)
+        (1 + c) / 2 * (1 - b**2) / (1 - 2 * b * cos_g + b**2) ** 1.5
         +  # NOTE: just for formatting
-        (1 - c) / 2 * (1 - b**2) / np.power(1 + 2 * b * cos_g + b**2, 1.5)
+        (1 - c) / 2 * (1 - b**2) / (1 + 2 * b * cos_g + b**2) ** 1.5
     )
 
 
@@ -113,3 +116,12 @@ def phase_function(
             return cornette_shanks(cos_g, args[0])
         case _:
             raise Exception("Unsupported phase function")
+
+
+def legendre_coefficients(
+    cos_g: npt.NDArray,
+    value: npt.NDArray,
+    degree: int = 14,
+):
+    leg = np.polynomial.Legendre.fit(cos_g, value, deg=degree, domain=[-1, 1])
+    return leg.coef
