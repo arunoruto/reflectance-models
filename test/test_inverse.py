@@ -53,6 +53,7 @@ def test_inverse_amsa():
         ],
         axis=0,
     )
+    print(f"Albedo shape: {albedo.shape}")
 
     a_n = coef_a()
     b_n = coef_b(b, c)
