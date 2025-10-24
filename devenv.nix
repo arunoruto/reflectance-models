@@ -33,6 +33,9 @@
   enterShell = ''
     hello
     git --version
+    if [ ! -L "$DEVENV_ROOT/.venv" ]; then
+        ln -s "$DEVENV_STATE/venv/" "$DEVENV_ROOT/.venv"
+    fi
   '';
 
   # https://devenv.sh/tasks/

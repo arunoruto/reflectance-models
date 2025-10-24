@@ -41,9 +41,12 @@ profiling = [
 ]
 
 [tool.pyright]
-exclude = [".venv", ".devenv/state/venv"]
-venvPath = ".devenv/state/venv"
+exclude = [".venv"]
+venvPath = ".venv"
 venv = "."
+
+[tool.ty.environment]
+python = "./.venv"
 
 [tool.ruff]
 lint.ignore = ["F722"]
@@ -55,21 +58,12 @@ log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 
-# [build-system]
-# requires = ["hatchling"]
-# build-backend = "hatchling.build"
+[tool.uv.build-backend]
+module-root = ""
 
-# [tool.setuptools.packages.find]
-# where = ["."]
-# include = ["refmod"]
-# exclude = []
-# namespace = false
-
-[tool.setuptools]
-packages = ["refmod"]
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
-build-backend = "setuptools.build_meta"
+requires = ["uv_build >= 0.8.0, <0.10.0"]
+build-backend = "uv_build"
 
 [semantic_release]
 version_variable = ["refmod/__init__.py:__version__"]
