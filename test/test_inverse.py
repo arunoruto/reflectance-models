@@ -1,5 +1,6 @@
 import numpy as np
 from astropy.io import fits
+
 from refmod.dtm_helper import dtm2grad
 from refmod.hapke import Hapke
 from refmod.hapke.functions.legendre import coef_a, coef_b
@@ -53,24 +54,21 @@ def test_inverse_amsa():
         ],
         axis=0,
     )
-    print(f"Albedo shape: {albedo.shape}")
 
     a_n = coef_a()
     b_n = coef_b(b, c)
     refl = amsa(
         albedo,
+        b_n,
         i,
         e,
         n,
-        "dhg",
-        b_n,
         a_n,
         tb,
         hs,
         bs0,
         hc,
         bc0,
-        (b, c),
     )
     # albedo_recon = np.zeros_like(refl)
     # for k in range(refl.shape[0] * refl.shape[1]):
@@ -112,14 +110,12 @@ def test_inverse_amsa():
         incidence_direction=i,
         emission_direction=e,
         surface_orientation=n,
-        phase_function_type="dhg",
+        legendre_coefficients=coef_b(b, c),
         roughness=tb,
         shadow_hiding_h=hs,
         shadow_hiding_b0=bs0,
         coherant_backscattering_h=hc,
         coherant_backscattering_b0=bc0,
-        phase_function_args=(b, c),
-        legendre_expansion=15,
     )
     albedo_recon = model.albedo(refl)
 

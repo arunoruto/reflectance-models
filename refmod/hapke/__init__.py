@@ -5,8 +5,7 @@ import numpy.typing as npt
 from pydantic import BaseModel, ConfigDict, Field
 from scipy.optimize import least_squares
 
-from .functions.legendre import coef_a, coef_b
-from .functions.phase import PhaseFunctionType
+from .functions.legendre import coef_a
 from .models import amsa, amsa_scalar, imsa
 
 __all__ = ["amsa", "imsa", "Hapke"]
@@ -17,14 +16,12 @@ class Hapke(BaseModel):
     incidence_direction: npt.NDArray = Field(default=np.array(0.0))
     emission_direction: npt.NDArray = Field(default=np.array(0.0))
     surface_orientation: npt.NDArray = Field(default=np.array([0.0, 0.0, 1.0]))
-    phase_function_type: PhaseFunctionType = Field(default="dhg")
+    legendre_coefficients: npt.NDArray = Field(default=np.array([1.0, 0.0, 0.5]))
     roughness: float = Field(default=0.0)
     shadow_hiding_h: float = Field(default=0.0)
     shadow_hiding_b0: float = Field(default=0.0)
     coherant_backscattering_h: float = Field(default=0.0)
     coherant_backscattering_b0: float = Field(default=0.0)
-    phase_function_args: tuple = Field(default=())
-    legendre_expansion: int = Field(default=15)
 
     model: Literal["amsa", "imsa"] = Field(default="amsa")
     h_level: Literal[1, 2] = Field(default=2)
@@ -59,11 +56,11 @@ class Hapke(BaseModel):
             )
         if self.model == "amsa":
             return amsa(
+                single_scattering_albedo=self.single_scattering_albedo,
+                phase_function_legendre=self.legendre_coefficients,
                 incidence_direction=self.incidence_direction,
                 emission_direction=self.emission_direction,
                 surface_orientation=self.surface_orientation,
-                single_scattering_albedo=self.single_scattering_albedo,
-                phase_function_type=self.phase_function_type,
                 roughness=self.roughness,
                 shadow_hiding_h=self.shadow_hiding_h,
                 shadow_hiding_b0=self.shadow_hiding_b0,
@@ -77,7 +74,7 @@ class Hapke(BaseModel):
                 emission_direction=self.emission_direction,
                 surface_orientation=self.surface_orientation,
                 single_scattering_albedo=self.single_scattering_albedo,
-                phase_function_type=self.phase_function_type,
+                b_n=self.legendre_coefficients,
                 roughness=self.roughness,
                 opposition_effect_h=self.shadow_hiding_h,
                 opposition_effect_b0=self.shadow_hiding_b0,
@@ -104,8 +101,7 @@ class Hapke(BaseModel):
                 reflectance.shape,
             )
 
-        a_n = coef_a(n=self.legendre_expansion)
-        b_n = coef_b(*self.phase_function_args, n=self.legendre_expansion)
+        a_n = coef_a(n=self.legendre_coefficients.shape[0] - 1)
 
         space_shape = self.surface_orientation.shape[1:]
         bands_shape = reflectance.shape[: len(space_shape) - 1]
@@ -125,34 +121,22 @@ class Hapke(BaseModel):
         ).reshape(3, -1)
         reflectance = reflectance.reshape(-1)
 
-        # print(f"""
-        #           {space_shape=}
-        #           {bands_shape=}
-        #           {original_shape=}
-        #           {incidence_direction.shape=}
-        #           {emission_direction.shape=}
-        #           {surface_orientation.shape=}
-        #           {reflectance.shape=}
-        #       """)
-
         albedo_recon = least_squares(
             amsa_scalar,
             np.ones_like(reflectance) / 3,
             # method="lm",
             # verbose=2,
             kwargs=dict(
+                b_n=self.legendre_coefficients,
                 incidence_direction=incidence_direction,
                 emission_direction=emission_direction,
                 surface_orientation=surface_orientation,
-                phase_function_type=self.phase_function_type,
-                b_n=b_n,
                 a_n=a_n,
                 roughness=self.roughness,
                 shadow_hiding_h=self.shadow_hiding_h,
                 shadow_hiding_b0=self.shadow_hiding_b0,
                 coherant_backscattering_h=self.coherant_backscattering_h,
                 coherant_backscattering_b0=self.coherant_backscattering_b0,
-                phase_function_args=self.phase_function_args,
                 refl_optimization=reflectance,
                 h_level=self.h_level,
             ),
@@ -161,3 +145,18 @@ class Hapke(BaseModel):
         self.single_scattering_albedo = np.array(albedo_recon.x.reshape(original_shape))
 
         return self.single_scattering_albedo
+
+    # single_scattering_albedo: npt.NDArray,
+    # b_n: npt.NDArray,
+    # incidence_direction: npt.NDArray,
+    # emission_direction: npt.NDArray,
+    # surface_orientation: npt.NDArray,
+    # a_n: npt.NDArray | None = None,
+    # roughness: float = 0,
+    # shadow_hiding_h: float = 0.0,
+    # shadow_hiding_b0: float = 0.0,
+    # coherant_backscattering_h: float = 0.0,
+    # coherant_backscattering_b0: float = 0.0,
+    # refl_optimization: npt.NDArray | None = None,
+    # h_level: int = 2,
+    # imsa: bool = False,

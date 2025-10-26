@@ -1,14 +1,14 @@
 import numpy as np
 import numpy.typing as npt
 from numba import jit
+
 from refmod.config import cache
 from refmod.hapke.functions.h import h_function, h_function_derivative
-from refmod.hapke.functions.legendre import function_p, value_p
+from refmod.hapke.functions.legendre import coef_a, function_p, legendre_eval, value_p
 from refmod.hapke.functions.opposition_effect import (
     coherant_backscattering,
     shadow_hiding,
 )
-from refmod.hapke.functions.phase import PhaseFunctionType, phase_function
 from refmod.hapke.functions.roughness import microscopic_roughness
 from refmod.hapke.functions.vectors import angle_processing, dot0, normalize_keepdims
 
@@ -16,19 +16,18 @@ from refmod.hapke.functions.vectors import angle_processing, dot0, normalize_kee
 # @jit(nogil=True, fastmath=True, cache=cache)
 def __amsa_preprocess(
     single_scattering_albedo: npt.NDArray,
+    b_n: npt.NDArray,
     incidence_direction: npt.NDArray,
     emission_direction: npt.NDArray,
     surface_orientation: npt.NDArray,
-    phase_function_type: PhaseFunctionType = "dhg",
-    b_n: npt.NDArray | None = None,
     a_n: npt.NDArray | None = None,
     roughness: float = 0.0,
     shadow_hiding_h: float = 0.0,
     shadow_hiding_b0: float = 0.0,
     coherant_backscattering_h: float = 0.0,
     coherant_backscattering_b0: float = 0.0,
-    phase_function_args: tuple = (),
     h_level: int = 2,
+    imsa: bool = False,
 ):
     """Preprocesses the inputs for the AMSA model.
 
@@ -43,8 +42,6 @@ def __amsa_preprocess(
         Emission direction vector(s) of shape (..., 3).
     surface_orientation : npt.NDArray
         Surface orientation vector(s) of shape (..., 3).
-    phase_function_type : PhaseFunctionType
-        Type of phase function to use.
     b_n : npt.NDArray
         Coefficients of the Legendre expansion.
     a_n : npt.NDArray
@@ -59,8 +56,6 @@ def __amsa_preprocess(
         Coherent backscattering parameter, by default 0.0.
     coherant_backscattering_b0 : float, optional
         Coherent backscattering parameter, by default 0.0.
-    phase_function_args : tuple, optional
-        Additional arguments for the phase function, by default ().
 
     Returns
     -------
@@ -87,14 +82,19 @@ def __amsa_preprocess(
             - h_mu : npt.NDArray
                 H-function values for mu.
     """
+    if a_n is None:
+        a_n = coef_a(b_n.shape[0] - 1)
     # Angles
     incidence_direction /= normalize_keepdims(incidence_direction, 0)
     emission_direction /= normalize_keepdims(emission_direction, 0)
     surface_orientation /= normalize_keepdims(surface_orientation, 0)
 
     # Roughness
-    s, mu_0, mu = microscopic_roughness(
-        roughness, incidence_direction, emission_direction, surface_orientation
+    s, mu_0, mu = microscopic_roughness(  # type: ignore
+        roughness,
+        incidence_direction,
+        emission_direction,
+        surface_orientation,
     )
 
     # Phase angle Alpha
@@ -102,16 +102,16 @@ def __amsa_preprocess(
     sin_alpha = np.sqrt(1 - cos_alpha**2)
     tan_alpha_2 = sin_alpha / (1 + cos_alpha)
 
-    p_g = phase_function(cos_alpha, phase_function_type, phase_function_args)
+    p_g = legendre_eval(cos_alpha, b_n)
 
     # H-Function
-    if b_n is None:
+    if imsa:
         h_level = 1
     h_mu_0 = h_function(mu_0, single_scattering_albedo, level=h_level)
     h_mu = h_function(mu, single_scattering_albedo, level=h_level)
 
-    if b_n is None:
-        # If the Legendre terms are not used, the model reduces to IMSA
+    if imsa:
+        # reduce model to IMSA
         p_mu_0 = np.ones_like(h_mu_0)
         p_mu = np.ones_like(h_mu)
         p = 1.0
@@ -159,20 +159,19 @@ def __amsa_preprocess(
 # @jit(nogil=True, fastmath=True, cache=cache)
 def amsa_scalar(
     single_scattering_albedo: npt.NDArray,
+    b_n: npt.NDArray,
     incidence_direction: npt.NDArray,
     emission_direction: npt.NDArray,
     surface_orientation: npt.NDArray,
-    phase_function_type: PhaseFunctionType = "dhg",
-    b_n: npt.NDArray | None = None,
     a_n: npt.NDArray | None = None,
-    roughness: float = 0,
+    roughness: float = 0.0,
     shadow_hiding_h: float = 0.0,
     shadow_hiding_b0: float = 0.0,
     coherant_backscattering_h: float = 0.0,
     coherant_backscattering_b0: float = 0.0,
-    phase_function_args: tuple = (),
     refl_optimization: npt.NDArray | None = None,
     h_level: int = 2,
+    imsa: bool = False,
 ) -> npt.NDArray:
     """Calculates the reflectance using the AMSA model.
 
@@ -203,8 +202,6 @@ def amsa_scalar(
         Coherent backscattering parameter, by default 0.
     coherant_backscattering_b0 : float, optional
         Coherent backscattering parameter, by default 0.
-    phase_function_args : tuple, optional
-        Additional arguments for the phase function, by default ().
     refl_optimization : npt.NDArray | None, optional
         Reflectance optimization array, by default None.
 
@@ -238,19 +235,18 @@ def amsa_scalar(
         _,
     ) = __amsa_preprocess(
         single_scattering_albedo,
+        b_n,
         incidence_direction,
         emission_direction,
         surface_orientation,
-        phase_function_type,
-        b_n,
         a_n,
         roughness,
         shadow_hiding_h,
         shadow_hiding_b0,
         coherant_backscattering_h,
         coherant_backscattering_b0,
-        phase_function_args,
         h_level,
+        imsa,
     )
     # Reflectance
     refl = albedo_independent * single_scattering_albedo * (p_g + m)
@@ -268,26 +264,25 @@ def amsa_scalar(
 
     if refl_optimization is not None:
         refl -= refl_optimization
-    return refl
+    return np.squeeze(refl)
 
 
 # @jit(nogil=True, fastmath=True, cache=cache)
 def amsa(
     single_scattering_albedo: npt.NDArray,
+    phase_function_legendre: npt.NDArray,
     incidence_direction: npt.NDArray,
     emission_direction: npt.NDArray,
     surface_orientation: npt.NDArray,
-    phase_function_type: PhaseFunctionType = "dhg",
-    b_n: npt.NDArray | None = None,
     a_n: npt.NDArray | None = None,
     roughness: float = 0,
     shadow_hiding_h: float = 0.0,
     shadow_hiding_b0: float = 0.0,
     coherant_backscattering_h: float = 0.0,
     coherant_backscattering_b0: float = 0.0,
-    phase_function_args: tuple = (),
     refl_optimization: npt.NDArray | None = None,
     h_level: int = 2,
+    imsa: bool = False,
 ) -> npt.NDArray:
     """Calculates the reflectance using the AMSA model.
 
@@ -302,8 +297,6 @@ def amsa(
         Emission direction vector(s) of shape (..., 3).
     surface_orientation : npt.NDArray
         Surface orientation vector(s) of shape (..., 3).
-    phase_function_type : PhaseFunctionType
-        Type of phase function to use.
     b_n : npt.NDArray
         Coefficients of the Legendre expansion.
     a_n : npt.NDArray
@@ -318,8 +311,6 @@ def amsa(
         Coherent backscattering parameter, by default 0.
     coherant_backscattering_b0 : float, optional
         Coherent backscattering parameter, by default 0.
-    phase_function_args : tuple, optional
-        Additional arguments for the phase function, by default ().
     refl_optimization : npt.NDArray | None, optional
         Reflectance optimization array, by default None.
 
@@ -372,20 +363,19 @@ def amsa(
 
     refl = amsa_scalar(
         single_scattering_albedo,
+        phase_function_legendre,
         incidence_direction,
         emission_direction,
         surface_orientation,
-        phase_function_type,
-        b_n,
         a_n,
         roughness,
         shadow_hiding_h,
         shadow_hiding_b0,
         coherant_backscattering_h,
         coherant_backscattering_b0,
-        phase_function_args,
         refl_optimization,
         h_level,
+        imsa,
     )
     return refl.reshape(original_shape)
 
@@ -396,17 +386,16 @@ def amsa_derivative(
     incidence_direction: npt.NDArray,
     emission_direction: npt.NDArray,
     surface_orientation: npt.NDArray,
-    phase_function_type: PhaseFunctionType,
-    b_n: npt.NDArray | None = None,
+    b_n: npt.NDArray,
     a_n: npt.NDArray | None = None,
     roughness: float = 0,
     shadow_hiding_h: float = 0.0,
     shadow_hiding_b0: float = 0.0,
     coherant_backscattering_h: float = 0.0,
     coherant_backscattering_b0: float = 0.0,
-    phase_function_args: tuple = (),
     refl_optimization: npt.NDArray | None = None,
     h_level: int = 2,
+    imsa: bool = False,
 ) -> npt.NDArray:
     """Calculates the derivative of the reflectance using the AMSA model.
 
@@ -470,7 +459,6 @@ def amsa_derivative(
         incidence_direction,
         emission_direction,
         surface_orientation,
-        phase_function_type,
         b_n,
         a_n,
         roughness,
@@ -478,7 +466,6 @@ def amsa_derivative(
         shadow_hiding_b0,
         coherant_backscattering_h,
         coherant_backscattering_b0,
-        phase_function_args,
     )
 
     dh0_dw = h_function_derivative(mu_0, single_scattering_albedo, h_level)
@@ -499,14 +486,14 @@ def amsa_derivative(
 # @jit(nogil=True, fastmath=True, cache=cache)
 def imsa(
     single_scattering_albedo: npt.NDArray,
+    b_n: npt.NDArray,
     incidence_direction: npt.NDArray,
     emission_direction: npt.NDArray,
     surface_orientation: npt.NDArray,
-    phase_function_type: PhaseFunctionType = "dhg",
+    a_n: npt.NDArray | None = None,
     roughness: float = 0.0,
     opposition_effect_h: float = 0.0,
     opposition_effect_b0: float = 0.0,
-    phase_function_args: tuple = (),
     h_level: int = 2,
 ) -> npt.NDArray:
     """Calculates reflectance using the IMSA model.
@@ -555,15 +542,14 @@ def imsa(
     """
     return amsa(
         single_scattering_albedo=single_scattering_albedo,
+        phase_function_legendre=b_n,
         incidence_direction=incidence_direction,
         emission_direction=emission_direction,
         surface_orientation=surface_orientation,
-        phase_function_type=phase_function_type,
-        b_n=None,
-        a_n=None,
+        a_n=a_n,
         roughness=roughness,
         shadow_hiding_h=opposition_effect_h,
         shadow_hiding_b0=opposition_effect_b0,
-        phase_function_args=phase_function_args,
         h_level=h_level,
+        imsa=True,
     )

@@ -1,7 +1,5 @@
 import numpy as np
 import numpy.typing as npt
-from numba import jit
-from scipy.optimize import least_squares
 
 
 def __linear_mixing(
@@ -17,6 +15,8 @@ def __linear_mixing(
         raise ValueError(
             "Number of end-members in bulk_density (mixing coefficients) and albedo need to be the same!"
         )
+    if bulk_density.ndim == 1:
+        bulk_density = bulk_density[:, np.newaxis]
     # phase function
     if phase_function_coefficients.shape[1:] != albedo.shape:
         raise ValueError(
@@ -24,31 +24,58 @@ def __linear_mixing(
         )
     # extinction efficiency
     if extinction_efficiency is None:
-        extinction_efficiency = np.ones((albedo.shape[1], 1))
-    elif extinction_efficiency.shape[0] != albedo.shape[1]:
+        extinction_efficiency = np.ones_like(albedo)
+    elif extinction_efficiency.shape != albedo.shape:
         raise ValueError(
-            "Extinction efficienceis and number of end-members should be the same!"
+            f"""
+            Extinction efficienceis and number of end-members should be the same!
+            {extinction_efficiency.shape=} {albedo.shape=}
+            """
         )
     # solid density
     if solid_density is None:
         solid_density = np.ones((albedo.shape[1], 1))
-    elif solid_density.shape[0] != albedo.shape[1]:
+    elif solid_density.shape[0] != solid_density.size != albedo.shape[1]:
         raise ValueError("Solid density and number of end-members should be the same!")
+    if solid_density.ndim == 1:
+        solid_density = solid_density[:, np.newaxis]
     # radius
     if radius is None:
         radius = np.ones((albedo.shape[1], 1))
-    elif radius.shape[0] != albedo.shape[1]:
+    elif radius.shape[0] != radius.size != albedo.shape[1]:
         raise ValueError("Radius and number of end-members should be the same!")
+    if radius.ndim == 1:
+        radius = radius[:, np.newaxis]
 
-    coefficients = bulk_density * extinction_efficiency / solid_density / radius
-    coefficients /= np.sum(coefficients, axis=0, keepdims=True)
+    coefficients = bulk_density / solid_density / radius
+    # print(albedo.shape)
+    # print(bulk_density.shape, solid_density.shape, radius.shape)
+    # print(coefficients.shape)
+    # print(extinction_efficiency.shape)
+    # print(albedo * extinction_efficiency == albedo)
 
-    # resulting_albedo = coefficients * albedo
-    resulting_albedo = albedo @ coefficients
+    resulting_albedo = (albedo * extinction_efficiency) @ coefficients
+    resulting_albedo /= extinction_efficiency @ coefficients
+    # print(f"""
+    #     {extinction_efficiency.shape=},
+    #     {coefficients.shape=},
+    #     {(extinction_efficiency @ coefficients).shape=},
+    #     {albedo.shape=}
+    #     {resulting_albedo.shape=}
+    # """)
+    # print(f"""
+    #     {(extinction_efficiency @ coefficients)=},
+    # """)
+
+    albedo = albedo[np.newaxis, :, :]
+    extinction_efficiency = extinction_efficiency[np.newaxis, :, :]
+
     resulting_phase_function_coefficients = (
-        phase_function_coefficients * resulting_albedo / np.atleast_3d(resulting_albedo)
-    )
-
+        phase_function_coefficients * albedo * extinction_efficiency
+    ) @ coefficients
+    resulting_phase_function_coefficients /= (
+        albedo * extinction_efficiency
+    ) @ coefficients
     return resulting_albedo, resulting_phase_function_coefficients
 
 
@@ -56,17 +83,31 @@ def __list_to_legendre(
     phase_function: list[npt.NDArray],
     legendre_expansion: int = 15,
 ) -> npt.NDArray:
-    legendre_coefficients = np.empty((legendre_expansion, len(phase_function)))
+    if phase_function[0].ndim != 2:
+        raise ValueError("Phase function arrays must be 2D! (angles x wavelengths)")
+    num_wavelengths = phase_function[0].shape[1]
+    legendre_coefficients = np.empty(
+        (legendre_expansion + 1, num_wavelengths, len(phase_function))
+    )
     for i, p in enumerate(phase_function):
-        # TODO: this is quite an assumption, but it works here
-        # Maybe let the user provide a list of theta values in the future!
-        cos_g = np.cos(np.linspace(0, np.pi, p.size))
-        legendre_coefficients[:, i] = np.polynomial.Legendre.fit(
-            cos_g,
-            p,
-            deg=legendre_expansion,
-            domain=[-1, 1],
-        ).coef
+        if p.ndim != 2:
+            # TODO: if ndim is 1, repeat it for every "wavelength"
+            raise ValueError("Phase function arrays must be 2D! (angles x wavelengths)")
+        for j in range(num_wavelengths):
+            if p.shape[1] != num_wavelengths:
+                raise ValueError(
+                    "All phase function arrays must have the same number of wavelengths!"
+                )
+            # TODO: this is quite an assumption, but it works here
+            # Maybe let the user provide a list of theta values in the future!
+            cos_g = np.cos(np.linspace(0, np.pi, p.shape[0]))
+            print(f"{cos_g.shape=} {p.shape=}")
+            legendre_coefficients[:, j, i] = np.polynomial.Legendre.fit(
+                cos_g,
+                p[:, j],
+                deg=legendre_expansion,
+                domain=[-1, 1],
+            ).coef
     return legendre_coefficients
 
 
@@ -124,13 +165,8 @@ def linear_mixing(
 def nonlinear_unmixing(
     reflectance: npt.NDArray,
     albedo_endmembers: npt.NDArray,
-    phase_function_endmembers: list[npt.NDArray],
+    phase_function_coefficients_endmembers: npt.NDArray,
     extinction_efficiency: npt.NDArray | None = None,
     solid_density: npt.NDArray | None = None,
     radius: npt.NDArray | None = None,
-    legendre_expansion: int = 15,
-) -> npt.NDArray | None:
-    legendre_coefficients = __list_to_legendre(
-        phase_function_endmembers,
-        legendre_expansion,
-    )
+) -> npt.NDArray | None: ...

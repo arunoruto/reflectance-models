@@ -12,11 +12,13 @@ anisotropic scattering and phase functions.
 import numpy as np
 import numpy.typing as npt
 from numba import jit
+
 from refmod.config import cache
 
 
 @jit(nogil=True, fastmath=True, cache=cache)
 def coef_a(n: int = 15) -> npt.NDArray:
+    # def coef_a(n: int | tuple[int] = 15) -> npt.NDArray:
     """Calculates coefficients 'a_n' for Legendre polynomial series.
 
     These coefficients are used in Hapke's photometric model.
@@ -37,10 +39,21 @@ def coef_a(n: int = 15) -> npt.NDArray:
     ----------
     Hapke (2002, Eq. 27).
     """
-    a_n = np.zeros(n + 1)
-    a_n[1] = -0.5
+    # r = 1
+    # if isinstance(n, tuple):
+    #     if len(n) == 2:
+    #         r = n[1]
+    #     n = n[0]
+    # a_n = np.zeros((n + 1, r))
+    # if isinstance(n, int):
+    #     s = (n + 1,)
+    # else:
+    #     s = (n[0] + 1,) + n[1:]
+    # a_n = np.zeros(s)
+    a_n = np.zeros((n + 1, 1, 1))
+    a_n[1, ...] = -0.5
     for i in range(3, n + 1, 2):
-        a_n[i] = (2 - i) / (i + 1) * a_n[i - 2]
+        a_n[i, ...] = (2 - i) / (i + 1) * a_n[i - 2, ...]
     return a_n
 
 
@@ -78,20 +91,23 @@ def coef_b(b: float = 0.21, c: float = 0.7, n: int = 15) -> npt.NDArray:
     ----------
     Hapke (2002, p. 530).
     """
+    range_n = np.arange(n + 1)
     if np.isnan(c):
-        range_n = np.arange(n + 1) + 1
+        range_n += 1
         b_n = (2 * range_n + 1) * np.power(-b, range_n)
     else:
-        range_n = np.arange(n + 1)
-        b_n = c * (2 * range_n + 1) * np.power(b, range_n)
+        b_n = (2 * range_n + 1) * np.power(b, range_n)
+        b_n[1::2] *= c
     return b_n
 
 
 @jit(nogil=True, fastmath=True, cache=cache)
 def function_p(
     x: npt.NDArray,
-    b_n: npt.NDArray | None = None,
-    a_n: npt.NDArray | None = None,
+    b_n: npt.NDArray,
+    a_n: npt.NDArray,
+    # b_n: npt.NDArray | None = None,
+    # a_n: npt.NDArray | None = None,
 ) -> npt.NDArray:
     """Calculates the P function from Hapke's model.
 
@@ -118,10 +134,11 @@ def function_p(
     ----------
     Hapke (2002, Eqs. 23, 24).
     """
-    if b_n is None:
-        return x * 0 + 1  # P = 1 if no b_n coefficients are provided
-    if a_n is None:
-        a_n = coef_a(b_n.size - 1)  # Corrected size for coef_a
+    # print(f"{a_n.shape=} {b_n.shape=} {x.shape=}")
+    # if b_n is None:
+    #     return x * 0 + 1  # P = 1 if no b_n coefficients are provided
+    # if a_n is None:
+    #     a_n = coef_a(b_n.shape[0] - 1)  # Corrected size for coef_a
 
     p_n_2 = np.zeros_like(x) * x + 1
     p_n_1 = np.ones_like(x) * x
@@ -136,7 +153,7 @@ def function_p(
     return res
 
 
-@jit(nogil=True, fastmath=True, cache=cache)
+# @jit(nogil=True, fastmath=True, cache=cache)
 def value_p(
     b_n: npt.NDArray | None,
     a_n: npt.NDArray | None = None,
@@ -166,5 +183,53 @@ def value_p(
     if b_n is None:
         return 1.0
     if a_n is None:
-        a_n = coef_a(b_n.size - 1)  # Corrected size for coef_a
+        a_n = coef_a(b_n.shape[0] - 1)  # Corrected size for coef_a
     return 1.0 + np.sum(a_n**2 * b_n)
+
+
+@jit(nogil=True, fastmath=True, cache=cache)
+def legendre_eval(
+    x: npt.NDArray,
+    b_n: npt.NDArray,
+) -> npt.NDArray:
+    """Calculates the function at x with legendre coefficients b_n.
+
+    This function relates to the integrated phase function and accounts for
+    anisotropic scattering.
+
+    Parameters
+    ----------
+
+    x : npt.NDArray
+        Input array, typically cosine of angles (e.g., mu, mu0).
+    b_n : npt.NDArray
+        Array of legendre coefficients.
+
+    Returns
+    -------
+    npt.NDArray
+        Calculated function at x.
+
+    References
+    ----------
+    Hapke (2002, Eqs. 19).
+    """
+    x_shape = x.shape
+    b_shape = b_n.shape[1:]
+    x = x.ravel()[:, np.newaxis]
+    b_n = b_n.reshape((b_n.shape[0], -1))
+
+    shape = (
+        np.prod(np.array(x_shape, dtype=np.int64)),
+        np.prod(np.array(b_shape, dtype=np.int64)),
+    )
+    p_n_2 = np.ones(shape)
+    p_n_1 = np.ones(shape) * x
+    p_n = np.empty(shape)
+    res = p_n_2 * np.atleast_2d(b_n[0, :]) + p_n_1 * np.atleast_2d(b_n[1, :])
+    for i in range(2, b_n.shape[0]):
+        p_n = (2 - 1 / i) * x * p_n_1 - (1 - 1 / i) * p_n_2
+        res += p_n * np.atleast_2d(b_n[i, :])
+        p_n_2 = p_n_1
+        p_n_1 = p_n
+    return res.reshape(x_shape + b_shape)
