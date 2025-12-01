@@ -9,16 +9,18 @@ anisotropic scattering and phase functions.
     Hapke (2002)
 """
 
+from functools import cache
+
 import numpy as np
 import numpy.typing as npt
 from numba import jit
 
-from refmod.config import cache
+# from refmod.config import cache
 
 
-@jit(nogil=True, fastmath=True, cache=cache)
+@cache
+@jit(nogil=True, fastmath=True, cache=True)
 def coef_a(n: int = 15) -> npt.NDArray:
-    # def coef_a(n: int | tuple[int] = 15) -> npt.NDArray:
     """Calculates coefficients 'a_n' for Legendre polynomial series.
 
     These coefficients are used in Hapke's photometric model.
@@ -57,7 +59,7 @@ def coef_a(n: int = 15) -> npt.NDArray:
     return a_n
 
 
-@jit(nogil=True, fastmath=True, cache=cache)
+@jit(nogil=True, fastmath=True, cache=True)
 def coef_b(b: float = 0.21, c: float = 0.7, n: int = 15) -> npt.NDArray:
     """Calculates coefficients 'b_n' for Legendre polynomial expansion.
 
@@ -101,7 +103,7 @@ def coef_b(b: float = 0.21, c: float = 0.7, n: int = 15) -> npt.NDArray:
     return b_n
 
 
-@jit(nogil=True, fastmath=True, cache=cache)
+@jit(nogil=True, fastmath=True, cache=True)
 def function_p(
     x: npt.NDArray,
     b_n: npt.NDArray,
@@ -153,7 +155,7 @@ def function_p(
     return res
 
 
-# @jit(nogil=True, fastmath=True, cache=cache)
+# @jit(nogil=True, fastmath=True, cache=True)
 def value_p(
     b_n: npt.NDArray | None,
     a_n: npt.NDArray | None = None,
@@ -187,7 +189,7 @@ def value_p(
     return 1.0 + np.sum(a_n**2 * b_n)
 
 
-@jit(nogil=True, fastmath=True, cache=cache)
+@jit(nogil=True, fastmath=True, cache=True)
 def legendre_eval(
     x: npt.NDArray,
     b_n: npt.NDArray,

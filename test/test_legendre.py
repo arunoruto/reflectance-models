@@ -27,3 +27,33 @@ def test_legendre_eval():
         legval = np.moveaxis(legval, -1, 0)
 
     npt.assert_allclose(legval, eval, rtol=1e-5, atol=1e-5)
+
+
+def test_consistency_phase_legendre():
+    from refmod.hapke.functions.legendre import coef_b, legendre_eval
+    from refmod.hapke.functions.phase import double_henyey_greenstein
+
+    b = 0.21
+    c = 0.7
+    # Test angles: 0 to 180 degrees
+    g = np.deg2rad(np.linspace(0, 180, 100))
+    cos_g = np.cos(g)
+
+    # 1. Calculate via explicit Phase Function
+    p_explicit = double_henyey_greenstein(cos_g, b, c)
+
+    # 2. Calculate via Legendre Expansion
+    # High degree to ensure convergence
+    b_n = coef_b(b, c, n=100)
+    p_legendre = legendre_eval(cos_g, b_n)
+
+    # Compare
+    # They should be very close if definitions match
+    np.testing.assert_allclose(
+        p_legendre,
+        p_explicit,
+        rtol=1e-4,
+        atol=1e-4,
+        err_msg="Legendre coefficients do not match Phase Function definition",
+    )
+

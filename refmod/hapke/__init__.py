@@ -13,10 +13,10 @@ __all__ = ["amsa", "imsa", "Hapke"]
 
 class Hapke(BaseModel):
     single_scattering_albedo: npt.NDArray | None = Field(default=None)
+    legendre_coefficients: npt.NDArray = Field(default=np.array([1.0, 0.0, 0.5]))
     incidence_direction: npt.NDArray = Field(default=np.array(0.0))
     emission_direction: npt.NDArray = Field(default=np.array(0.0))
     surface_orientation: npt.NDArray = Field(default=np.array([0.0, 0.0, 1.0]))
-    legendre_coefficients: npt.NDArray = Field(default=np.array([1.0, 0.0, 0.5]))
     roughness: float = Field(default=0.0)
     shadow_hiding_h: float = Field(default=0.0)
     shadow_hiding_b0: float = Field(default=0.0)
