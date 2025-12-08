@@ -3,7 +3,7 @@ from astropy.io import fits
 
 from refmod.dtm_helper import dtm2grad
 from refmod.hapke import Hapke
-from refmod.hapke.functions.legendre import coef_a, coef_b
+from refmod.hapke.functions.legendre import coef_a, dhg_legendre_coefficients
 from refmod.hapke.inverse import inverse_model
 from refmod.hapke.models import amsa
 
@@ -56,7 +56,7 @@ def test_inverse_amsa():
     )
 
     a_n = coef_a()
-    b_n = coef_b(b, c)
+    b_n = dhg_legendre_coefficients(b, c)
     refl = amsa(
         albedo,
         b_n,
@@ -110,7 +110,7 @@ def test_inverse_amsa():
         incidence_direction=i,
         emission_direction=e,
         surface_orientation=n,
-        legendre_coefficients=coef_b(b, c),
+        legendre_coefficients=dhg_legendre_coefficients(b, c),
         roughness=tb,
         shadow_hiding_h=hs,
         shadow_hiding_b0=bs0,

@@ -9,6 +9,7 @@ from refmod.hapke.functions.opposition_effect import (
     coherant_backscattering,
     shadow_hiding,
 )
+from refmod.hapke.functions.phase import PhaseFunctionType, phase_function
 from refmod.hapke.functions.roughness import microscopic_roughness
 from refmod.hapke.functions.vectors import angle_processing, dot0, normalize_keepdims
 
@@ -26,6 +27,8 @@ def __amsa_preprocess(
     shadow_hiding_b0: float = 0.0,
     coherant_backscattering_h: float = 0.0,
     coherant_backscattering_b0: float = 0.0,
+    phase_function_type: PhaseFunctionType | None = None,
+    phase_function_args: tuple = (),
     h_level: int = 2,
     imsa: bool = False,
 ):
@@ -102,7 +105,10 @@ def __amsa_preprocess(
     sin_alpha = np.sqrt(1 - cos_alpha**2)
     tan_alpha_2 = sin_alpha / (1 + cos_alpha)
 
-    p_g = legendre_eval(cos_alpha, b_n)
+    if phase_function_type is not None:
+        p_g = phase_function(cos_alpha, phase_function_type, phase_function_args)
+    else:
+        p_g = legendre_eval(cos_alpha, b_n)
 
     # H-Function
     if imsa:
@@ -169,6 +175,8 @@ def amsa_scalar(
     shadow_hiding_b0: float = 0.0,
     coherant_backscattering_h: float = 0.0,
     coherant_backscattering_b0: float = 0.0,
+    phase_function_type: PhaseFunctionType | None = None,
+    phase_function_args: tuple = (),
     refl_optimization: npt.NDArray | None = None,
     h_level: int = 2,
     imsa: bool = False,
@@ -245,6 +253,8 @@ def amsa_scalar(
         shadow_hiding_b0,
         coherant_backscattering_h,
         coherant_backscattering_b0,
+        phase_function_type,
+        phase_function_args,
         h_level,
         imsa,
     )
@@ -280,6 +290,8 @@ def amsa(
     shadow_hiding_b0: float = 0.0,
     coherant_backscattering_h: float = 0.0,
     coherant_backscattering_b0: float = 0.0,
+    phase_function_type: PhaseFunctionType | None = None,
+    phase_function_args: tuple = (),
     refl_optimization: npt.NDArray | None = None,
     h_level: int = 2,
     imsa: bool = False,
@@ -373,6 +385,8 @@ def amsa(
         shadow_hiding_b0,
         coherant_backscattering_h,
         coherant_backscattering_b0,
+        phase_function_type,
+        phase_function_args,
         refl_optimization,
         h_level,
         imsa,

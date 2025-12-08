@@ -15,8 +15,6 @@ import numpy as np
 import numpy.typing as npt
 from numba import jit
 
-# from refmod.config import cache
-
 
 @cache
 @jit(nogil=True, fastmath=True, cache=True)
@@ -52,54 +50,69 @@ def coef_a(n: int = 15) -> npt.NDArray:
     # else:
     #     s = (n[0] + 1,) + n[1:]
     # a_n = np.zeros(s)
-    a_n = np.zeros((n + 1, 1, 1))
-    a_n[1, ...] = -0.5
+
+    # a_n = np.zeros((n + 1, 1, 1))
+    # a_n[1, ...] = -0.5
+    # for i in range(3, n + 1, 2):
+    #     a_n[i, ...] = (2 - i) / (i + 1) * a_n[i - 2, ...]
+    # return a_n
+
+    a_n = np.zeros(n + 1)
+    a_n[1] = -0.5
     for i in range(3, n + 1, 2):
-        a_n[i, ...] = (2 - i) / (i + 1) * a_n[i - 2, ...]
+        a_n[i] = (2 - i) / (i + 1) * a_n[i - 2]
     return a_n
+    # return a_n.reshape(-1, 1, 1)
 
 
 @jit(nogil=True, fastmath=True, cache=True)
-def coef_b(b: float = 0.21, c: float = 0.7, n: int = 15) -> npt.NDArray:
-    """Calculates coefficients 'b_n' for Legendre polynomial expansion.
-
-    These coefficients are used in Hapke's photometric model, specifically
-    for the phase function representation.
+def dhg_legendre_coefficients(
+    b: float = 0.21, c: float = 0.7, n: int = 15
+) -> npt.NDArray:
+    """Calculates Legendre coefficients for the Double Henyey-Greenstein phase function.
 
     Parameters
     ----------
 
     b : float, optional
-        Asymmetry parameter for the Henyey-Greenstein phase function component,
-        by default 0.21.
+        Asymmetry parameter, by default 0.21.
     c : float, optional
-        Parameter determining the mixture of Henyey-Greenstein functions or
-        a single function if NaN, by default 0.7.
-        If `c` is `np.nan`, a single Henyey-Greenstein function is assumed.
+        Backscatter fraction, by default 0.7.
     n : int, optional
-        The number of coefficients to calculate (degree of Legendre polynomial),
-        by default 15. The resulting array will have `n + 1` elements.
+        The number of coefficients to calculate, by default 15.
 
     Returns
     -------
     npt.NDArray
-        Array of 'b_n' coefficients, shape (n + 1,).
-
-    Notes
-    -----
-    The calculation method depends on whether `c` is NaN.
-
-    References
-    ----------
-    Hapke (2002, p. 530).
+        Array of Legendre coefficients.
     """
     range_n = np.arange(n + 1)
-    if np.isnan(c):
-        range_n += 1
-        b_n = (2 * range_n + 1) * np.power(-b, range_n)
-    else:
-        b_n = (2 * range_n + 1) * np.power(b, range_n)
-        b_n[1::2] *= c
+    b_n = (2 * range_n + 1) * np.power(b, range_n)
+    b_n = b_n.astype(np.float64)
+    b_n[1::2] *= c
+    return b_n
+    # return b_n.reshape(-1, 1, 1)
+
+
+@jit(nogil=True, fastmath=True, cache=True)
+def cornette_shanks_legendre_coefficients(b: float = 0.21, n: int = 15) -> npt.NDArray:
+    """Calculates Legendre coefficients for the Cornette-Shanks phase function.
+
+    Parameters
+    ----------
+
+    b : float, optional
+        Asymmetry parameter, by default 0.21.
+    n : int, optional
+        The number of coefficients to calculate, by default 15.
+
+    Returns
+    -------
+    npt.NDArray
+        Array of Legendre coefficients.
+    """
+    range_n = np.arange(n + 1) + 1
+    b_n = (2 * range_n + 1) * np.power(-b, range_n)
     return b_n
 
 
