@@ -95,16 +95,8 @@ def test_amsa_hopper():
     # i = np.tile(i, (u, v, 1))
     # e = np.tile(e, (u, v, 1))
 
-    b_n = dhg_legendre_coefficients(b, c)
     a_n = coef_a()
-    # b_n_actual = dhg_legendre_coefficients(b, c)
-    # range_n = np.arange(15 + 1)
-    # b_n = (c * (2 * range_n + 1) * np.power(b, range_n)).reshape(-1, 1, 1)
-    # print(b_n_actual.squeeze())
-    # print(b_n.squeeze())
-    # print(a_n.squeeze())
-    # print(a_n.squeeze() * b_n_actual.squeeze())
-    # print(a_n.squeeze() * b_n.squeeze())
+    b_n = dhg_legendre_coefficients(b, c)
 
     refl = amsa(
         albedo,
@@ -118,8 +110,6 @@ def test_amsa_hopper():
         bs0,
         hc,
         bc0,
-        # phase_function_type="dhg",
-        # phase_function_args=(b, c),
     )
     result[np.isnan(refl)] = np.nan
     np.testing.assert_allclose(refl, result)
