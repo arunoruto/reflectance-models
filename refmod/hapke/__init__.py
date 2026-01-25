@@ -30,6 +30,11 @@ class Hapke(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def model_post_init(self, __context: Any) -> None:
+        """Post-initialization hook to ensure array shapes are correct.
+
+        Ensures incidence_direction, emission_direction, and surface_orientation
+        have at least 3 dimensions (batch dimensions + vector dimension).
+        """
         if self.incidence_direction.ndim < 2:
             self.incidence_direction = np.ascontiguousarray(
                 self.incidence_direction
@@ -85,7 +90,32 @@ class Hapke(BaseModel):
         self,
         reflectance: npt.NDArray,
         least_squares_param: dict = {"method": "lm"},
+        x0: npt.NDArray | None = None,
     ) -> npt.NDArray:
+        """Invert the Hapke model to estimate single scattering albedo.
+
+        Parameters
+        ----------
+        reflectance : npt.NDArray
+            Observed reflectance values.
+        least_squares_param : dict, optional
+            Additional parameters passed to scipy.optimize.least_squares,
+            by default {"method": "lm"}.
+        x0 : npt.NDArray | None, optional
+            Initial guess for single scattering albedo. If None, defaults to 1/3.
+
+        Returns
+        -------
+        npt.NDArray
+            Estimated single scattering albedo.
+
+        Raises
+        ------
+        ValueError
+            If the model is not 'amsa'.
+        Exception
+            If the reflectance array has invalid dimensions (>3).
+        """
         if self.model != "amsa":
             raise ValueError(
                 "Albedo inversion is only implemented for the 'amsa' model."
@@ -103,27 +133,49 @@ class Hapke(BaseModel):
 
         a_n = coef_a(n=self.legendre_coefficients.shape[0] - 1)
 
-        space_shape = self.surface_orientation.shape[1:]
-        bands_shape = reflectance.shape[: len(space_shape) - 1]
+        # Direction vectors are shaped as (..., 3). The last axis is always the
+        # vector component axis and should not be treated as a spatial dimension.
+        space_shape = self.surface_orientation.shape[1:-1]
+        bands_shape = reflectance.shape[: len(space_shape)]
 
         original_shape = np.array(reflectance.shape)
-        incidence_direction = np.tile(
-            np.expand_dims(self.incidence_direction, axis=1),
-            (1, *bands_shape, 1, 1),
-        ).reshape(3, -1)
-        emission_direction = np.tile(
-            np.expand_dims(self.emission_direction, axis=1),
-            (1, *bands_shape, 1, 1),
-        ).reshape(3, -1)
-        surface_orientation = np.tile(
-            np.expand_dims(self.surface_orientation, axis=1),
-            (1, *bands_shape, 1, 1),
-        ).reshape(3, -1)
+        # Expand/tile vectors to match the flattened reflectance.
+        # Vectors are stored as (..., 3); reshape to (3, N) directly.
+        incidence_direction = (
+            np.tile(
+                np.expand_dims(self.incidence_direction, axis=1),
+                (1, *bands_shape, 1, 1),
+            )
+            .reshape(-1, 3)
+            .T
+        )
+        emission_direction = (
+            np.tile(
+                np.expand_dims(self.emission_direction, axis=1),
+                (1, *bands_shape, 1, 1),
+            )
+            .reshape(-1, 3)
+            .T
+        )
+        surface_orientation = (
+            np.tile(
+                np.expand_dims(self.surface_orientation, axis=1),
+                (1, *bands_shape, 1, 1),
+            )
+            .reshape(-1, 3)
+            .T
+        )
         reflectance = reflectance.reshape(-1)
+
+        initial_guess = np.ones_like(reflectance) / 3 if x0 is None else np.asarray(x0)
+        if initial_guess.shape != reflectance.shape:
+            raise ValueError(
+                f"x0 must have the same shape as reflectance; got {initial_guess.shape} vs {reflectance.shape}"
+            )
 
         albedo_recon = least_squares(
             amsa_scalar,
-            np.ones_like(reflectance) / 3,
+            initial_guess,
             # method="lm",
             # verbose=2,
             kwargs=dict(

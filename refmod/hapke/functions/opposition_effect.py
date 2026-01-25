@@ -10,6 +10,22 @@ def shadow_hiding(
     h: float = 0.0,
     b0: float = 0.0,
 ) -> npt.NDArray:
+    """Calculates the shadow hiding opposition effect term B_sh(g).
+
+    Parameters
+    ----------
+    x : npt.NDArray
+        Input parameter, typically related to phase angle, e.g., tan(alpha/2).
+    h : float, optional
+        Width of the opposition surge, by default 0.0.
+    b0 : float, optional
+        Amplitude of the opposition surge, by default 0.0.
+
+    Returns
+    -------
+    npt.NDArray
+        Shadow hiding term values.
+    """
     # b_sh = np.ones_like(x)
     b_sh = 0.0 * x + 1.0
     if (b0 > 0.0) and (h > 0.0):
@@ -23,6 +39,22 @@ def coherant_backscattering(
     h: float = 0.0,
     b0: float = 0.0,
 ) -> npt.NDArray:
+    """Calculates the coherent backscattering opposition effect term B_cb(g).
+
+    Parameters
+    ----------
+    x : npt.NDArray
+        Input parameter, typically related to phase angle, e.g., tan(alpha/2).
+    h : float, optional
+        Width of the coherent backscattering peak, by default 0.0.
+    b0 : float, optional
+        Amplitude of the coherent backscattering peak, by default 0.0.
+
+    Returns
+    -------
+    npt.NDArray
+        Coherent backscattering term values.
+    """
     # b_cb = np.ones_like(x)
     b_cb = 0.0 * x + 1.0
     if (b0 != 0) and (h != 0):

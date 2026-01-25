@@ -123,5 +123,21 @@ def legendre_coefficients(
     value: npt.NDArray,
     degree: int = 14,
 ):
+    """Fits Legendre coefficients to a phase function.
+
+    Parameters
+    ----------
+    cos_g : npt.NDArray
+        Cosine of the scattering angle.
+    value : npt.NDArray
+        Phase function values.
+    degree : int, optional
+        Degree of the Legendre polynomial fit, by default 14.
+
+    Returns
+    -------
+    npt.NDArray
+        Legendre coefficients.
+    """
     leg = np.polynomial.Legendre.fit(cos_g, value, deg=degree, domain=[-1, 1])
     return leg.coef

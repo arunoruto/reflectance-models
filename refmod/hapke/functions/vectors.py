@@ -35,28 +35,18 @@ def normalize(x: npt.NDArray, axis: int = 0) -> npt.NDArray:
 def normalize_keepdims(x: npt.NDArray, axis: int = 0) -> npt.NDArray:
     """Normalizes a vector or batch of vectors, keeping dimensions.
 
-    Calculates the L2 norm of the input array along the specified axis,
-    then expands the dimensions of the output to match the input array's
-    dimension along the normalization axis. This is useful for broadcasting
-    the norm for division.
+    Returns the L2 norm along `axis` with a kept dimension for broadcasting.
 
-    Parameters
-    ----------
-
-    x : npt.NDArray
-        Input array representing a vector or a batch of vectors.
-    axis : int, optional
-        Axis along which to compute the norm, by default -1.
-
-    Returns
-    -------
-    npt.NDArray
-        The L2 norm of the input array, with dimensions kept for broadcasting.
+    Notes
+    -----
+    This helper is used in several places that subsequently divide by the
+    returned norm. To avoid `0/0` and `x/0` producing NaNs/Infs, the norm is
+    lower-bounded by a small epsilon.
     """
     temp = np.sqrt(np.sum(x**2, axis=axis))
     if isinstance(temp, float):
         temp = np.array(temp)
-        # temp = np.array([temp])
+    temp = np.maximum(temp, 1e-12)
     return np.expand_dims(temp, axis=axis)
 
 
@@ -135,6 +125,17 @@ def angle_processing(
 )
 # @guvectorize([(float64[:], float64[:], float64[:])], "(n),(n)->()", cache=cache)
 def dot0(vec_a: npt.NDArray, vec_b: npt.NDArray, cos_phi: npt.NDArray):
+    """Computes the dot product of two vectors, clamped to [-1, 1].
+
+    Parameters
+    ----------
+    vec_a : npt.NDArray
+        First vector or batch of vectors.
+    vec_b : npt.NDArray
+        Second vector or batch of vectors.
+    cos_phi : npt.NDArray
+        Output array to store the result.
+    """
     for j in range(vec_a.shape[1]):  # Looping over the 'n' dimension
         sum_val = 0.0
         for i in range(vec_a.shape[0]):  # Looping over the 'm' dimension (axis 0)
