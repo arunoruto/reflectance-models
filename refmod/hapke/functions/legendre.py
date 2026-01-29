@@ -172,7 +172,7 @@ def function_p(
 def value_p(
     b_n: npt.NDArray | None,
     a_n: npt.NDArray | None = None,
-) -> float | np.floating:
+) -> npt.NDArray:
     """Calculates the scalar value P from Hapke's model.
 
     This value is used in the expression for single particle phase function.
@@ -196,10 +196,14 @@ def value_p(
     Hapke (2002, Eq. 25).
     """
     if b_n is None:
-        return 1.0
+        return np.asarray(1.0)
     if a_n is None:
         a_n = coef_a(b_n.shape[0] - 1)  # Corrected size for coef_a
-    return 1.0 + np.sum(a_n**2 * b_n)
+
+    # `b_n` may be provided per-wavelength (shape: (n, bands)) or as a single
+    # coefficient vector (shape: (n,)). Always sum over the Legendre-order axis.
+    weights = (a_n**2).reshape((-1,) + (1,) * (b_n.ndim - 1))
+    return np.asarray(1.0 + np.sum(weights * b_n, axis=0))
 
 
 @jit(nogil=True, fastmath=True, cache=True)
@@ -232,7 +236,7 @@ def legendre_eval(
     x_shape = x.shape
     b_shape = b_n.shape[1:]
     x = x.ravel()[:, np.newaxis]
-    b_n = b_n.reshape((b_n.shape[0], -1))
+    b_n = np.ascontiguousarray(b_n).reshape((b_n.shape[0], -1))
 
     shape = (
         np.prod(np.array(x_shape, dtype=np.int64)),

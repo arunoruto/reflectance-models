@@ -101,7 +101,6 @@ def __list_to_legendre(
             # TODO: this is quite an assumption, but it works here
             # Maybe let the user provide a list of theta values in the future!
             cos_g = np.cos(np.linspace(0, np.pi, p.shape[0]))
-            print(f"{cos_g.shape=} {p.shape=}")
             legendre_coefficients[:, j, i] = np.polynomial.Legendre.fit(
                 cos_g,
                 p[:, j],

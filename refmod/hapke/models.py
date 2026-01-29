@@ -85,6 +85,7 @@ def __amsa_preprocess(
     if a_n is None:
         a_n = coef_a(b_n.shape[0] - 1)
     # Angles
+    # Direction arrays are shaped as (3, N) at this point.
     incidence_direction /= normalize_keepdims(incidence_direction, 0)
     emission_direction /= normalize_keepdims(emission_direction, 0)
     surface_orientation /= normalize_keepdims(surface_orientation, 0)
