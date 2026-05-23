@@ -1,33 +1,76 @@
 {
+  config,
   pkgs,
   lib,
-  config,
   inputs,
   ...
 }:
-
+let
+  cuda-combined = pkgs.symlinkJoin {
+    name = "cuda-combined-lib";
+    paths = with pkgs.cudaPackages_12; [
+      (lib.getLib cuda_cudart)
+      (lib.getLib cuda_cupti)
+      (lib.getLib libcublas)
+      (lib.getLib libcufft)
+      (lib.getLib libcusolver)
+      (lib.getLib libcusparse)
+      (lib.getLib cudnn)
+      cuda_nvcc
+    ];
+  };
+in
 {
-  env.GREET = "devenv";
-
-  packages = with pkgs; [
-    git
-    libz
+  overlays = [
+    (final: prev: {
+      unstable = import inputs.nixpkgs-unstable {
+        inherit (final.stdenv.hostPlatform) system;
+        config = {
+          allowUnfree = true;
+          nvidia.acceptLicense = true;
+        };
+      };
+    })
   ];
 
-  # shell = lib.mkForce pkgs.fish;
+  env = {
+    UV_PYTHON = toString config.languages.python.package.interpreter;
+    # LD_LIBRARY_PATH = lib.makeLibraryPath [
+    #   pkgs.stdenv.cc.cc.lib
+    #   pkgs.zlib
+    #   cuda-combined
+    #   "/run/opengl-driver"
+    # ];
+    XLA_FLAGS = "--xla_gpu_cuda_data_dir=${cuda-combined}";
 
-  # https://devenv.sh/processes/
-  # processes.cargo-watch.exec = "cargo-watch";
+    # JAX_ENABLE_X64 = "True";
+    # JAX_PLATFORMS = "cpu";
+    JAX_COMPILATION_CACHE_DIR = "/tmp/jax_cache";
+    JAX_PERSISTENT_CACHE_MIN_ENTRY_SIZE_BYTES = -1;
+    JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS = 0;
+    JAX_PERSISTENT_CACHE_ENABLE_XLA_CACHES = "xla_gpu_per_fusion_autotune_cache_dir";
+  };
 
-  # https://devenv.sh/services/
-  # services.postgres.enable = true;
+  packages = [
+    pkgs.unstable.beads
+    pkgs.git
+    cuda-combined
+  ];
 
-  # https://devenv.sh/scripts/
   scripts = {
     hello.exec = ''
-      echo hello from $GREET
+      echo x64 enabled: $JAX_ENABLE_X64
     '';
     pytest.exec = ''uv run pytest "$@"'';
+    ensure-beads.exec = ''
+      if [ -d "$DEVENV_ROOT/.beads" ]; then
+        # Check if daemon is responding, otherwise start it
+        if ! bd status >/dev/null 2>&1; then
+          echo "🔮 Starting Beads daemon..."
+          bd daemon --start --log "$DEVENV_ROOT/.beads/daemon.log"
+        fi
+      fi
+    '';
   };
 
   enterShell = ''
@@ -36,24 +79,13 @@
     if [ ! -L "$DEVENV_ROOT/.venv" ]; then
         ln -s "$DEVENV_STATE/venv/" "$DEVENV_ROOT/.venv"
     fi
+    # ensure-beads
   '';
 
-  # https://devenv.sh/tasks/
-  # tasks = {
-  #   "myproj:setup".exec = "mytool build";
-  #   "devenv:enterShell".after = [ "myproj:setup" ];
-  # };
-
-  # https://devenv.sh/tests/
   enterTest = ''
     echo "Running tests"
     git --version | grep --color=auto "${pkgs.git.version}"
   '';
-
-  # https://devenv.sh/git-hooks/
-  # git-hooks.hooks.shellcheck.enable = true;
-
-  # See full reference at https://devenv.sh/reference/options/
 
   languages.python = {
     enable = true;
@@ -68,9 +100,14 @@
           "docs"
           "profiling"
         ];
+        extras = [ "jax" ];
       };
     };
 
-    libraries = [ pkgs.zlib ];
+    libraries = [
+      pkgs.zlib
+      "/run/opengl-driver"
+      cuda-combined
+    ];
   };
 }
