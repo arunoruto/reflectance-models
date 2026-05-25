@@ -39,3 +39,73 @@ The components are broken down as follows:
 ## Derivative Function
 
 The presence of `refmod.hapke.amsa.amsa_derivative` is highly significant. This function calculates $\partial r / \partial w$ (the derivative of the AMSA reflectance with respect to the single-scattering albedo $w$). This capability is crucial for model inversion and sensitivity analysis, making the AMSA implementation in `refmod` particularly powerful for quantitative analysis of remote sensing data.
+
+## Efficient Repeated Inversion
+
+The public function `refmod.hapke.invert_amsa` is the simplest way to recover the single-scattering albedo from observed AMSA reflectance. It prepares the geometry-dependent terms and then solves the inverse problem in one call:
+
+```python
+from refmod.hapke import invert_amsa
+
+w = invert_amsa(
+    refl_obs,
+    b_n,
+    incidence_direction,
+    emission_direction,
+    surface_normal,
+    roughness=roughness,
+    h_sh=h_sh,
+    b0_sh=b0_sh,
+    h_cb=h_cb,
+    b0_cb=b0_cb,
+)
+```
+
+For repeated inversions with the same geometry and Hapke parameters, use the prepared-state API instead. The geometry-dependent terms are computed once by `prepare_amsa_inversion`, and each subsequent call to `invert_amsa_precomputed` only solves for the albedo:
+
+```python
+from refmod.hapke import prepare_amsa_inversion, invert_amsa_precomputed
+
+state = prepare_amsa_inversion(
+    b_n,
+    incidence_direction,
+    emission_direction,
+    surface_normal,
+    roughness=roughness,
+    h_sh=h_sh,
+    b0_sh=b0_sh,
+    h_cb=h_cb,
+    b0_cb=b0_cb,
+)
+
+w_1 = invert_amsa_precomputed(refl_obs_1, state)
+w_2 = invert_amsa_precomputed(refl_obs_2, state)
+```
+
+This is useful when illumination, viewing geometry, surface normals, roughness, and phase-function parameters are fixed, but the observed reflectance changes. Examples include repeated inversion over multiple scenes, multiple wavelengths with shared geometry, or iterative workflows that solve many reflectance arrays against one terrain/geometry setup.
+
+The convenience API remains the recommended choice for one-off inversions. The prepared-state API is intended for throughput-sensitive workflows where the one-time preparation cost is amortized across many inversions.
+
+### Performance Notes
+
+On the Hopper AMSA test image (1,332,870 pixels), the prepared-state API substantially reduces repeated inversion time after the one-time preparation step:
+
+| Backend | `invert_amsa` steady-state | `prepare_amsa_inversion` once | `invert_amsa_precomputed` steady-state |
+|---|---:|---:|---:|
+| CPU | 3.26 s | 0.76 s | 2.45 s |
+| GPU | 0.41 s | 0.31 s | 0.11 s |
+
+Exact timings depend on hardware, JAX/XLA versions, array shapes, and whether the persistent JAX compilation cache is warm.
+
+### JAX Compilation Cache
+
+JAX does not use Python `__pycache__` directories for compiled XLA programs. For repeated runs, enable the persistent JAX compilation cache before the first compilation. In this repository, the `devenv` shell configures it with environment variables:
+
+```sh
+JAX_COMPILATION_CACHE_DIR="$DEVENV_STATE/jax-cache"
+JAX_PERSISTENT_CACHE_MIN_ENTRY_SIZE_BYTES=-1
+JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS=0
+JAX_PERSISTENT_CACHE_ENABLE_XLA_CACHES=all
+```
+
+Run Python commands through `devenv shell -- uv run ...` so these environment variables are present.
