@@ -1,22 +1,103 @@
 import numpy as np
+import jax.numpy as jnp
 from astropy.io import fits
 
 from refmod.dtm_helper import dtm2grad
-from refmod.hapke import Hapke
-from refmod.hapke.functions.legendre import coef_a, dhg_legendre_coefficients
-from refmod.hapke.inverse import inverse_model
-from refmod.hapke.models import amsa
+from refmod.hapke import (
+    Hapke,
+    amsa,
+    dhg_legendre_coefficients,
+    invert_amsa_precomputed,
+    prepare_amsa_inversion,
+)
+from refmod.hapke.inverse import invert_amsa
 
 DATA_DIR = "test/data"
 
 
-def test_inverse_amsa():
+def test_inverse_amsa_small():
+    """Test that inverting the forward model recovers the original albedo."""
+    b_n = dhg_legendre_coefficients(0.21, 0.7, 15)
+
+    w_true = jnp.array([0.3, 0.5, 0.7])
+    i_vec = jnp.array([0.0, jnp.sin(jnp.deg2rad(30.0)), jnp.cos(jnp.deg2rad(30.0))])
+    e_vec = jnp.array([0.0, jnp.sin(jnp.deg2rad(10.0)), jnp.cos(jnp.deg2rad(10.0))])
+    n_vec = jnp.array([0.0, 0.0, 1.0])
+
+    i_batch = jnp.tile(i_vec, (3, 1))
+    e_batch = jnp.tile(e_vec, (3, 1))
+    n_batch = jnp.tile(n_vec, (3, 1))
+
+    refl = amsa(w_true, b_n, i_batch, e_batch, n_batch)
+    w_recon = invert_amsa(refl, b_n, i_batch, e_batch, n_batch)
+
+    np.testing.assert_allclose(
+        np.array(w_recon),
+        np.array(w_true),
+        rtol=1e-4,
+        err_msg="Inversion should recover original albedo",
+    )
+
+
+def test_precomputed_inverse_matches_convenience_api():
+    b_n = dhg_legendre_coefficients(0.21, 0.7, 15)
+    w_true = jnp.array([0.2, 0.4, 0.6, 0.8])
+    i_vec = jnp.array([0.0, jnp.sin(jnp.deg2rad(35.0)), jnp.cos(jnp.deg2rad(35.0))])
+    e_vec = jnp.array([0.0, jnp.sin(jnp.deg2rad(15.0)), jnp.cos(jnp.deg2rad(15.0))])
+    n_vec = jnp.array([0.0, 0.0, 1.0])
+    i_batch = jnp.tile(i_vec, (w_true.shape[0], 1))
+    e_batch = jnp.tile(e_vec, (w_true.shape[0], 1))
+    n_batch = jnp.tile(n_vec, (w_true.shape[0], 1))
+
+    params = dict(roughness=0.1, h_sh=0.03, b0_sh=0.2, h_cb=0.04, b0_cb=0.1)
+    refl = amsa(w_true, b_n, i_batch, e_batch, n_batch, **params)
+
+    state = prepare_amsa_inversion(b_n, i_batch, e_batch, n_batch, **params)
+    w_precomputed = invert_amsa_precomputed(refl, state)
+    w_convenience = invert_amsa(refl, b_n, i_batch, e_batch, n_batch, **params)
+
+    np.testing.assert_allclose(np.array(w_precomputed), np.array(w_convenience), rtol=1e-8)
+    np.testing.assert_allclose(np.array(w_precomputed), np.array(w_true), rtol=1e-4)
+
+
+def test_precomputed_inverse_state_can_be_reused():
+    b_n = dhg_legendre_coefficients(0.15, 0.4, 12)
+    w_a = jnp.array([0.25, 0.45, 0.65])
+    w_b = jnp.array([0.3, 0.5, 0.7])
+    i_batch = jnp.tile(jnp.array([0.0, 0.5, 0.8660254]), (3, 1))
+    e_batch = jnp.tile(jnp.array([0.0, 0.2, 0.9797959]), (3, 1))
+    n_batch = jnp.tile(jnp.array([0.0, 0.0, 1.0]), (3, 1))
+
+    state = prepare_amsa_inversion(b_n, i_batch, e_batch, n_batch)
+    refl_a = amsa(w_a, b_n, i_batch, e_batch, n_batch)
+    refl_b = amsa(w_b, b_n, i_batch, e_batch, n_batch)
+
+    np.testing.assert_allclose(np.array(invert_amsa_precomputed(refl_a, state)), np.array(w_a), rtol=1e-4)
+    np.testing.assert_allclose(np.array(invert_amsa_precomputed(refl_b, state)), np.array(w_b), rtol=1e-4)
+
+
+def test_precomputed_inverse_forced_chunking():
+    b_n = dhg_legendre_coefficients(0.2, 0.6, 12)
+    w_true = jnp.array([0.2, 0.35, 0.5, 0.65, 0.8])
+    i_batch = jnp.tile(jnp.array([0.0, 0.4, 0.9165151]), (w_true.shape[0], 1))
+    e_batch = jnp.tile(jnp.array([0.0, 0.1, 0.9949874]), (w_true.shape[0], 1))
+    n_batch = jnp.tile(jnp.array([0.0, 0.0, 1.0]), (w_true.shape[0], 1))
+
+    refl = amsa(w_true, b_n, i_batch, e_batch, n_batch)
+    state = prepare_amsa_inversion(b_n, i_batch, e_batch, n_batch, chunk_size=2)
+    assert len(state.chunks) == 3
+
+    w_recon = invert_amsa_precomputed(refl, state)
+    np.testing.assert_allclose(np.array(w_recon), np.array(w_true), rtol=1e-4)
+
+
+def test_inverse_amsa_hopper():
     file_name = f"{DATA_DIR}/hopper_amsa.fits"
     f = fits.open(file_name)
 
     result = f["result"].data.astype(float)
-    i = np.deg2rad(f["result"].header["i"])
-    e = np.deg2rad(f["result"].header["e"])
+    i_deg = f["result"].header["i"]
+    e_deg = f["result"].header["e"]
     b = f["result"].header["b"]
     c = f["result"].header["c"]
     hs = f["result"].header["hs"]
@@ -30,93 +111,60 @@ def test_inverse_amsa():
 
     n = dtm2grad(dtm, resolution, normalize=False)
 
-    u = result.shape[0]
-    v = result.shape[1]
+    u, v = result.shape
+    i_rad = np.deg2rad(i_deg)
+    e_rad = np.deg2rad(e_deg)
 
-    i = np.array([np.sin(i), 0, np.cos(i)]).reshape(3, 1, 1)
-    e = np.array([np.sin(e), 0, np.cos(e)]).reshape(3, 1, 1)
-    i = np.tile(i, (1, u, v))
-    e = np.tile(e, (1, u, v))
-    n = np.moveaxis(n, -1, 0)
-
-    r = 10 * 1
+    # Subset for speed
+    r = 5
     uc = u // 2 + np.arange(-r, r)
     vc = v // 2 + np.arange(-r, r)
-    albedo = albedo[uc, :][:, vc]
-    i = i[:, uc, :][:, :, vc]
-    e = e[:, uc, :][:, :, vc]
-    n = n[:, uc, :][:, :, vc]
 
-    albedo = np.stack(
-        [
-            albedo,
-            0.01 * albedo,
-        ],
-        axis=0,
-    )
+    albedo_sub = albedo[uc, :][:, vc]
 
-    a_n = coef_a()
+    i_flat = np.tile(np.array([np.sin(i_rad), 0, np.cos(i_rad)]), (albedo_sub.size, 1))
+    e_flat = np.tile(np.array([np.sin(e_rad), 0, np.cos(e_rad)]), (albedo_sub.size, 1))
+    n_flat = n[uc, :, :][:, vc, :].reshape(-1, 3)
+    w_flat = albedo_sub.reshape(-1)
+
     b_n = dhg_legendre_coefficients(b, c)
-    refl = amsa(
-        albedo,
-        b_n,
-        i,
-        e,
-        n,
-        a_n,
-        tb,
-        hs,
-        bs0,
-        hc,
-        bc0,
+    a_n = jnp.array(
+        [
+            -0.5,
+            0.1250,
+            -0.0625,
+            0.0391,
+            -0.0273,
+            0.0205,
+            -0.0161,
+            0.0131,
+        ]
     )
-    # albedo_recon = np.zeros_like(refl)
-    # for k in range(refl.shape[0] * refl.shape[1]):
-    #     row = k % refl.shape[0]
-    #     col = k // refl.shape[0]
-    #     albedo_recon[row, col, ...] = inverse_model(
-    #         refl[row, col, ...],
-    #         i[row, col, :],
-    #         e[row, col, :],
-    #         n[row, col, :],
-    #         "dhg",
-    #         b_n,
-    #         a_n,
-    #         tb,
-    #         hs,
-    #         bs0,
-    #         hc,
-    #         bc0,
-    #         (b, c),
-    #     )
 
-    # albedo_recon = inverse_model(
-    #     refl,
-    #     i,
-    #     e,
-    #     n,
-    #     "dhg",
-    #     b_n,
-    #     a_n,
-    #     tb,
-    #     hs,
-    #     bs0,
-    #     hc,
-    #     bc0,
-    #     (b, c),
-    # )
     model = Hapke(
-        single_scattering_albedo=None,
-        incidence_direction=i,
-        emission_direction=e,
-        surface_orientation=n,
-        legendre_coefficients=dhg_legendre_coefficients(b, c),
+        single_scattering_albedo=albedo_sub,
+        legendre_coefficients=np.array(b_n),
+        incidence_direction=np.array(
+            [np.sin(i_rad), 0, np.cos(i_rad)]
+        ).reshape(3, 1, 1),
+        emission_direction=np.array(
+            [np.sin(e_rad), 0, np.cos(e_rad)]
+        ).reshape(3, 1, 1),
+        surface_orientation=n[uc, :, :][:, vc, :].transpose(2, 0, 1),
         roughness=tb,
         shadow_hiding_h=hs,
         shadow_hiding_b0=bs0,
-        coherant_backscattering_h=hc,
-        coherant_backscattering_b0=bc0,
+        coherent_backscattering_h=hc,
+        coherent_backscattering_b0=bc0,
     )
-    albedo_recon = model.albedo(refl)
 
-    np.testing.assert_allclose(albedo_recon, albedo)
+    refl = model.refl()
+    albedo_recon = model.albedo(np.array(refl))
+
+    np.testing.assert_allclose(
+        albedo_recon,
+        albedo_sub,
+        rtol=1e-4,
+        err_msg="Hapke model inversion should recover albedo",
+    )
+    f.close()

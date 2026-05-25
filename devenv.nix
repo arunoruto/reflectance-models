@@ -45,10 +45,11 @@ in
 
     # JAX_ENABLE_X64 = "True";
     # JAX_PLATFORMS = "cpu";
-    JAX_COMPILATION_CACHE_DIR = "/tmp/jax_cache";
+    # JAX_PLATFORMS = "cpu";
+    JAX_ENABLE_X64 = "True";
     JAX_PERSISTENT_CACHE_MIN_ENTRY_SIZE_BYTES = -1;
     JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS = 0;
-    JAX_PERSISTENT_CACHE_ENABLE_XLA_CACHES = "xla_gpu_per_fusion_autotune_cache_dir";
+    JAX_PERSISTENT_CACHE_ENABLE_XLA_CACHES = "all";
   };
 
   packages = [
@@ -74,6 +75,8 @@ in
   };
 
   enterShell = ''
+    export JAX_COMPILATION_CACHE_DIR="$DEVENV_STATE/jax-cache"
+    mkdir -p "$JAX_COMPILATION_CACHE_DIR"
     hello
     git --version
     if [ ! -L "$DEVENV_ROOT/.venv" ]; then
@@ -100,7 +103,7 @@ in
           "docs"
           "profiling"
         ];
-        extras = [ "jax" ];
+        extras = ["jax-gpu"];
       };
     };
 
