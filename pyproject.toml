@@ -7,20 +7,19 @@ license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+  "jax>=0.6.2",
+  "jaxlib>=0.6.2",
+  "jaxtyping>=0.3.3",
   "numpy>=2.1",
-  "numba>=0.61.0",
+  "optimistix>=0.0.11",
+  "psutil>=7.2.2",
   "pydantic>=2.11.5",
   "scipy>=1.15.3",
 ]
 
 [project.optional-dependencies]
-jax = [
-  "jax>=0.6.2",
-  "jaxlib>=0.6.2",
+jax-gpu = [
   "jax-cuda12-plugin>=0.6.2",
-  "jaxtyping>=0.3.3",
-  "optimistix>=0.0.11",
-  # "jax-cuda12-plugin[with-cuda]>=0.6.2",
 ]
 
 [dependency-groups]
@@ -68,8 +67,7 @@ log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 
-[tool.uv.build-backend]
-module-root = ""
+
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
@@ -78,5 +76,5 @@ branch = "main"
 # build_command = "uv build"
 
 [build-system]
-requires = ["uv_build >= 0.8.0, <0.10.0"]
+requires = ["uv_build >= 0.8.0, <1.0.0"]
 build-backend = "uv_build"

@@ -2,6 +2,8 @@ test/test_jax*
 refmod/jax*
 documents/
 *.speedscope.json
+xla_gpu_kernel_cache_file
+*_kernel_cache*
 
 # Devenv
 .devenv*
@@ -14,7 +16,7 @@ devenv.local.nix
 .pre-commit-config.yaml
 
 # Ignore matlab files
-*.m
+# *.m
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

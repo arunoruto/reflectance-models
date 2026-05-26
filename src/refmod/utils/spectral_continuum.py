@@ -19,12 +19,10 @@ from __future__ import annotations
 from typing import Literal, cast
 
 import numpy as np
-from numba import njit
 
 _Method = Literal["numpy", "scipy"]
 
 
-@njit(cache=True)
 def _upper_monotone_chain(xv: np.ndarray, yv: np.ndarray) -> np.ndarray:
     """Compute upper monotone chain indices using Andrew's monotone chain algorithm.
 

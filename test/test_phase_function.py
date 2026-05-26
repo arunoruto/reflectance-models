@@ -1,7 +1,8 @@
 import logging
 
 import numpy as np
-from refmod.hapke.functions.phase import double_henyey_greenstein
+import jax.numpy as jnp
+from refmod.hapke._core import double_henyey_greenstein
 
 N = 180 * 4 + 1
 
@@ -17,7 +18,7 @@ def test_dhg():
     cos_g = np.cos(g)
     sin_g = np.sin(g)
 
-    p_g = double_henyey_greenstein(cos_g, b, c)
-    integral = float(0.5 * np.sum(p_g * sin_g) * d_g)
+    p_g = double_henyey_greenstein(jnp.array(cos_g), b, c)
+    integral = float(0.5 * np.sum(np.array(p_g) * sin_g) * d_g)
     logger.info(f"{b=} {c=} {integral=}")
     np.testing.assert_allclose(integral, 1, rtol=5e-3)
