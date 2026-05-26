@@ -47,16 +47,25 @@ def _adaptive_chunk_size(n_pixels: int) -> int:
         Maximum number of pixels that can be inverted in a single chunk
         without exhausting memory.
     """
-    device = jax.local_devices()[0]
+    if n_pixels <= 0:
+        return 0
 
-    if device.platform == "gpu":
-        mem = device.memory_stats()
-        if mem and mem.get("bytes_limit"):
-            usable = mem["bytes_limit"] * 0.9
-            return min(int(usable / _BYTES_PER_PIXEL), n_pixels)
+    def _safe_chunk_count(usable_bytes: float) -> int:
+        return min(max(1, int(usable_bytes / _BYTES_PER_PIXEL)), n_pixels)
+
+    try:
+        device = jax.local_devices()[0]
+        if device.platform == "gpu":
+            memory_stats = getattr(device, "memory_stats", None)
+            mem = memory_stats() if memory_stats is not None else None
+            bytes_limit = mem.get("bytes_limit") if mem else None
+            if bytes_limit:
+                return _safe_chunk_count(bytes_limit * 0.9)
+    except Exception:
+        pass
 
     usable = psutil.virtual_memory().available * 0.75
-    return min(int(usable / _BYTES_PER_PIXEL), n_pixels)
+    return _safe_chunk_count(usable)
 
 
 def _tanh_to_w(x: jax.Array) -> jax.Array:

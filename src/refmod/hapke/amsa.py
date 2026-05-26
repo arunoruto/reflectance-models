@@ -14,10 +14,6 @@ from ._core import (
     shadow_hiding,
     value_p,
 )
-
-EPS = 1e-15
-
-
 def _refl_amsa_scalar(
     w: jax.Array,
     b_n: jax.Array,
