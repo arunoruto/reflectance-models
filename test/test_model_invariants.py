@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from refmod.hapke import amsa, dhg_legendre_coefficients, imsa, mimsa
-from refmod.hapke._core import h_function
+from refmod.hapke._core import h_function, normalize
 from refmod.lambert import lambert
 
 
@@ -56,3 +56,10 @@ def test_h_function_increases_with_albedo_for_positive_mu():
     h_low = h_function(mu, 0.2)
     h_high = h_function(mu, 0.8)
     assert np.all(np.array(h_high) > np.array(h_low))
+
+
+def test_normalize_operates_per_vector_for_batched_input():
+    vectors = jnp.array([[3.0, 0.0, 4.0], [0.0, 5.0, 12.0]])
+    normalized = normalize(vectors)
+    norms = jnp.sqrt(jnp.sum(normalized**2, axis=-1))
+    np.testing.assert_allclose(np.array(norms), np.ones(2), rtol=1e-12)

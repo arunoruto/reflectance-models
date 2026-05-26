@@ -1,7 +1,3 @@
-import jax
-
-jax.config.update("jax_enable_x64", True)
-
 from importlib.metadata import version as get_version
 
 from .hapke import Hapke

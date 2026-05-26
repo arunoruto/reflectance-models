@@ -58,3 +58,23 @@ def test_hapke_albedo_inverse_roundtrip_synthetic():
     recon = model.albedo(refl)
 
     np.testing.assert_allclose(recon, ssa, rtol=3e-4, atol=1e-6)
+
+
+def test_hapke_albedo_accepts_broadcast_x0():
+    ssa = np.array([0.2, 0.4, 0.65, 0.85])
+    model = Hapke(
+        single_scattering_albedo=ssa,
+        legendre_coefficients=np.array(dhg_legendre_coefficients(0.2, 0.6, 12)),
+        incidence_direction=np.array([0.0, np.sin(np.deg2rad(35.0)), np.cos(np.deg2rad(35.0))]),
+        emission_direction=np.array([0.0, np.sin(np.deg2rad(15.0)), np.cos(np.deg2rad(15.0))]),
+        surface_orientation=np.array([0.0, 0.0, 1.0]),
+        model="amsa",
+    )
+
+    refl = model.refl()
+    default_recon = model.albedo(refl)
+    x0 = np.full_like(refl, 0.5)[np.newaxis, :]
+    x0_recon = model.albedo(refl, x0=x0)
+
+    assert np.all(np.isfinite(x0_recon))
+    np.testing.assert_allclose(x0_recon, default_recon, rtol=1e-5, atol=1e-6)

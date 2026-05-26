@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 
-EPS = 1e-15
+from refmod.config import EPS
 
 
 def normalize(v: jax.Array) -> jax.Array:
@@ -17,7 +17,7 @@ def normalize(v: jax.Array) -> jax.Array:
     jax.Array
         Normalized vector(s) with unit L2 norm.
     """
-    norm = jnp.sqrt(jnp.sum(v**2))
+    norm = jnp.sqrt(jnp.sum(v**2, axis=-1, keepdims=True))
     norm = jnp.maximum(norm, 1e-12)
     return v / norm
 

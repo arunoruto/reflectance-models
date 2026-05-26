@@ -8,10 +8,6 @@ from ._core import (
     normalize,
     roughness_correction,
 )
-
-EPS = 1e-15
-
-
 def _refl_imsa_scalar(
     w: jax.Array,
     b_n: jax.Array,

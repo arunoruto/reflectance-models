@@ -1,5 +1,6 @@
 import numpy as np
 import jax.numpy as jnp
+import pytest
 from astropy.io import fits
 
 from refmod.dtm_helper import dtm2grad
@@ -89,6 +90,58 @@ def test_precomputed_inverse_forced_chunking():
 
     w_recon = invert_amsa_precomputed(refl, state)
     np.testing.assert_allclose(np.array(w_recon), np.array(w_true), rtol=1e-4)
+
+
+def test_precomputed_inverse_rejects_reflectance_length_mismatch():
+    b_n = dhg_legendre_coefficients(0.15, 0.4, 12)
+    w = jnp.array([0.25, 0.45, 0.65])
+    i_batch = jnp.tile(jnp.array([0.0, 0.5, 0.8660254]), (3, 1))
+    e_batch = jnp.tile(jnp.array([0.0, 0.2, 0.9797959]), (3, 1))
+    n_batch = jnp.tile(jnp.array([0.0, 0.0, 1.0]), (3, 1))
+
+    state = prepare_amsa_inversion(b_n, i_batch, e_batch, n_batch)
+    refl = amsa(w, b_n, i_batch, e_batch, n_batch)
+
+    with pytest.raises(ValueError, match="reflectance length"):
+        invert_amsa_precomputed(jnp.concatenate([refl, refl[:1]]), state)
+
+
+def test_precomputed_inverse_rejects_w0_length_mismatch():
+    b_n = dhg_legendre_coefficients(0.15, 0.4, 12)
+    w = jnp.array([0.25, 0.45, 0.65])
+    i_batch = jnp.tile(jnp.array([0.0, 0.5, 0.8660254]), (3, 1))
+    e_batch = jnp.tile(jnp.array([0.0, 0.2, 0.9797959]), (3, 1))
+    n_batch = jnp.tile(jnp.array([0.0, 0.0, 1.0]), (3, 1))
+
+    state = prepare_amsa_inversion(b_n, i_batch, e_batch, n_batch)
+    refl = amsa(w, b_n, i_batch, e_batch, n_batch)
+
+    with pytest.raises(ValueError, match="initial guess length"):
+        invert_amsa_precomputed(refl, state, w0=jnp.ones(state.n_pixels + 1))
+
+
+def test_inverse_amsa_masks_nonfinite_reflectance():
+    b_n = dhg_legendre_coefficients(0.21, 0.7, 15)
+    w_true = jnp.array([0.3, 0.5, 0.7])
+    i_vec = jnp.array([0.0, jnp.sin(jnp.deg2rad(30.0)), jnp.cos(jnp.deg2rad(30.0))])
+    e_vec = jnp.array([0.0, jnp.sin(jnp.deg2rad(10.0)), jnp.cos(jnp.deg2rad(10.0))])
+    n_vec = jnp.array([0.0, 0.0, 1.0])
+    i_batch = jnp.tile(i_vec, (3, 1))
+    e_batch = jnp.tile(e_vec, (3, 1))
+    n_batch = jnp.tile(n_vec, (3, 1))
+
+    refl = amsa(w_true, b_n, i_batch, e_batch, n_batch)
+    refl_mixed = refl.at[1].set(jnp.nan)
+    state = prepare_amsa_inversion(b_n, i_batch, e_batch, n_batch)
+
+    w_direct = invert_amsa(refl_mixed, b_n, i_batch, e_batch, n_batch)
+    w_precomputed = invert_amsa_precomputed(refl_mixed, state)
+
+    finite_idx = np.array([0, 2])
+    np.testing.assert_allclose(np.array(w_direct)[finite_idx], np.array(w_true)[finite_idx], rtol=1e-4)
+    np.testing.assert_allclose(np.array(w_precomputed)[finite_idx], np.array(w_true)[finite_idx], rtol=1e-4)
+    np.testing.assert_allclose(np.array(w_direct[1]), 0.5)
+    np.testing.assert_allclose(np.array(w_precomputed[1]), 0.5)
 
 
 def test_inverse_amsa_hopper():
