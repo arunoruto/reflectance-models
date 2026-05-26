@@ -1,4 +1,7 @@
+import os
 import timeit
+
+os.environ.setdefault("JAX_ENABLE_X64", "True")
 
 import jax.numpy as jnp
 import numpy as np

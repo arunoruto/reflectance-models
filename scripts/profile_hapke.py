@@ -11,6 +11,8 @@ import glob
 import os
 import time
 
+os.environ.setdefault("JAX_ENABLE_X64", "True")
+
 import jax
 import jax.numpy as jnp
 import numpy as np
