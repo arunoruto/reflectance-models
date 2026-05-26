@@ -10,6 +10,6 @@ inputs:
     #       follows: nixpkgs
 nixpkgs:
   allowUnfree: true
-  per-platofrm:
+  per-platform:
     x86_64-linux:
       cudaSupport: true
