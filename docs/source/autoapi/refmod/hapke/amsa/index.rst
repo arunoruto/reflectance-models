@@ -11,10 +11,6 @@ refmod.hapke.amsa
 Module Contents
 ---------------
 
-.. py:data:: EPS
-   :value: 1e-15
-
-
 .. py:function:: _refl_amsa_scalar(w, b_n, i, e, n, roughness, h_sh, b0_sh, h_cb, b0_cb, a_n = None)
 
    Compute AMSA reflectance for a single pixel (scalar w, 3-vectors).

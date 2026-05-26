@@ -11,10 +11,6 @@ refmod.hapke.mimsa
 Module Contents
 ---------------
 
-.. py:data:: EPS
-   :value: 1e-15
-
-
 .. py:function:: _refl_mimsa_scalar(w, b_n, i, e, n, roughness, a_n = None)
 
    MIMSA reflectance for a single pixel.

@@ -11,10 +11,6 @@ refmod.hapke.imsa
 Module Contents
 ---------------
 
-.. py:data:: EPS
-   :value: 1e-15
-
-
 .. py:function:: _refl_imsa_scalar(w, b_n, i, e, n, roughness)
 
    IMSA reflectance for a single pixel.

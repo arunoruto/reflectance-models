@@ -2,7 +2,7 @@
 
 The AMSA model, an acronym for **Anisotropic Multiple Scattering Approximation**, represents an advanced formulation of Hapke's theory designed to more accurately account for the effects of anisotropic single-particle scattering on the multiple-scattering term. The definitive form of this model, which also incorporates a sophisticated treatment of opposition effects, is detailed by {cite:t}`Hapke-2002`.
 
-The functions `refmod.hapke.amsa.amsa` and `refmod.hapke.amsa.amsa_derivative` in this library implement this comprehensive and powerful model.
+The function `refmod.hapke.amsa.amsa` implements this comprehensive and powerful model.
 
 ## AMSA Reflectance Equation
 
@@ -38,7 +38,7 @@ The components are broken down as follows:
 
 ## Derivative Function
 
-The presence of `refmod.hapke.amsa.amsa_derivative` is highly significant. This function calculates $\partial r / \partial w$ (the derivative of the AMSA reflectance with respect to the single-scattering albedo $w$). This capability is crucial for model inversion and sensitivity analysis, making the AMSA implementation in `refmod` particularly powerful for quantitative analysis of remote sensing data.
+The analytical gradient $\partial r / \partial w$ (the derivative of the AMSA reflectance with respect to the single-scattering albedo $w$) is computed internally by `_fast_refl_amsa_and_grad_batched` and powers the Levenberg-Marquardt inversion in `invert_amsa`. This capability is crucial for model inversion and sensitivity analysis, making the AMSA implementation in `refmod` particularly powerful for quantitative analysis of remote sensing data.
 
 ## Efficient Repeated Inversion
 
