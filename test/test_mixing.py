@@ -98,7 +98,7 @@ def test_manual_complex_mixing():
     # Use (K, 1) for explicit property shapes as typically expected for per-endmember properties
     solid_density = rng.uniform(2000, 4000, size=(K, 1))
     radius = rng.uniform(1e-6, 1e-4, size=(K, 1))
-    
+
     albedo = rng.uniform(0.1, 0.9, size=(N, K))
     extinction_efficiency = rng.uniform(0.5, 2.5, size=(N, K))
     phase_function_coefficients = rng.uniform(-0.5, 0.5, size=(C, N, K))
@@ -128,13 +128,13 @@ def test_manual_complex_mixing():
         denominator_alb = 0.0
 
         for k in range(K):
-             geo = geometric_factors[k]
-             Q = extinction_efficiency[n, k]
-             w = albedo[n, k]
+            geo = geometric_factors[k]
+            Q = extinction_efficiency[n, k]
+            w = albedo[n, k]
 
-             term = geo * Q
-             numerator_alb += term * w
-             denominator_alb += term
+            term = geo * Q
+            numerator_alb += term * w
+            denominator_alb += term
 
         expected_albedo[n, 0] = numerator_alb / denominator_alb
 
@@ -152,11 +152,13 @@ def test_manual_complex_mixing():
                 p_val = phase_function_coefficients[c, n, k]
 
                 # Weighting by scattering cross section (proportional to w * Q * geo)
-                term = geo * Q * w 
+                term = geo * Q * w
                 numerator_phase += term * p_val
 
             expected_phase_coeffs[c, n, 0] = numerator_phase / denominator_phase
 
     # 4. Assert
     np.testing.assert_allclose(mixed_albedo, expected_albedo, err_msg="Albedo mismatch")
-    np.testing.assert_allclose(mixed_phase_coeffs, expected_phase_coeffs, err_msg="Phase Coeff mismatch")
+    np.testing.assert_allclose(
+        mixed_phase_coeffs, expected_phase_coeffs, err_msg="Phase Coeff mismatch"
+    )

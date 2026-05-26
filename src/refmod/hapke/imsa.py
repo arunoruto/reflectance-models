@@ -8,6 +8,8 @@ from ._core import (
     normalize,
     roughness_correction,
 )
+
+
 def _refl_imsa_scalar(
     w: jax.Array,
     b_n: jax.Array,

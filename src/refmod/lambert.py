@@ -21,7 +21,9 @@ def _lambert_scalar(w: jax.Array, i: jax.Array, n: jax.Array) -> jax.Array:
     jax.Array
         Reflectance (scalar).  Zero when the source is behind the surface.
     """
-    mu0 = jnp.dot(i, n)
+    i_n = i / jnp.maximum(jnp.sqrt(jnp.sum(i**2)), 1e-12)
+    n_n = n / jnp.maximum(jnp.sqrt(jnp.sum(n**2)), 1e-12)
+    mu0 = jnp.dot(i_n, n_n)
     return w * jnp.maximum(mu0, 0.0) / jnp.pi
 
 

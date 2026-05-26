@@ -31,9 +31,7 @@ def test_legendre_eval_scalar():
     g = np.linspace(0, np.pi, 100)
     cos_g = np.cos(g)
 
-    p_scalar = np.array([
-        float(legendre_eval(jnp.array(x), b_n)) for x in cos_g
-    ])
+    p_scalar = np.array([float(legendre_eval(jnp.array(x), b_n)) for x in cos_g])
 
     legval = np.polynomial.legendre.legval(cos_g, np.array(b_n))
 
@@ -63,13 +61,11 @@ def test_consistency_phase_legendre():
     cos_g = np.cos(g)
 
     b_n = dhg_legendre_coefficients(b, c_value, n=200)
-    p_legendre = np.array([
-        float(legendre_eval(jnp.array(x), b_n)) for x in cos_g
-    ])
+    p_legendre = np.array([float(legendre_eval(jnp.array(x), b_n)) for x in cos_g])
 
-    p_explicit = np.array([
-        float(double_henyey_greenstein(jnp.array(x), b, c_value)) for x in cos_g
-    ])
+    p_explicit = np.array(
+        [float(double_henyey_greenstein(jnp.array(x), b, c_value)) for x in cos_g]
+    )
 
     np.testing.assert_allclose(
         p_legendre,

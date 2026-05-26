@@ -163,7 +163,6 @@ def _invert_chunk(
         )
         lam = jnp.clip(lam, 1e-7, 1e7)
 
-        grad_max = jnp.max(jnp.where(active, jnp.abs(j_x * r), 0.0))
         active = active & (jnp.abs(j_x * r) > 1e-10)
 
         return x, lam, active, step_count + 1
@@ -224,6 +223,13 @@ def prepare_amsa_inversion(
         Reusable precomputed state for :func:`invert_amsa_precomputed`.
     """
     n_pixels = i.shape[0]
+
+    if n_pixels == 0:
+        raise ValueError("Cannot prepare inversion for zero pixels")
+
+    for name, arr in (("i", i), ("e", e), ("n", n)):
+        if arr.ndim != 2 or arr.shape[0] != n_pixels or arr.shape[-1] != 3:
+            raise ValueError(f"{name} must have shape ({n_pixels}, 3), got {arr.shape}")
 
     if chunk_size is None:
         chunk_size = _adaptive_chunk_size(n_pixels)

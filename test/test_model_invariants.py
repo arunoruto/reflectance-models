@@ -47,7 +47,9 @@ def test_hapke_family_zero_albedo_yields_zero_reflectance():
     n = jnp.tile(jnp.array([0.0, 0.0, 1.0]), (2, 1))
 
     np.testing.assert_allclose(np.array(imsa(w, b_n, i, e, n)), np.zeros(2), atol=1e-12)
-    np.testing.assert_allclose(np.array(mimsa(w, b_n, i, e, n)), np.zeros(2), atol=1e-12)
+    np.testing.assert_allclose(
+        np.array(mimsa(w, b_n, i, e, n)), np.zeros(2), atol=1e-12
+    )
     np.testing.assert_allclose(np.array(amsa(w, b_n, i, e, n)), np.zeros(2), atol=1e-12)
 
 
