@@ -1,6 +1,6 @@
 [project]
 name = "refmod"
-version = "0.2.0"
+version = "1.0.0"
 description = "Reflectance models in python"
 authors = [{ name = "Mirza Arnaut", email = "mirza.arnaut@tu-dortmund.de" }]
 license = { text = "MIT" }
