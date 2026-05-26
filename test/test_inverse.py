@@ -57,7 +57,9 @@ def test_precomputed_inverse_matches_convenience_api():
     w_precomputed = invert_amsa_precomputed(refl, state)
     w_convenience = invert_amsa(refl, b_n, i_batch, e_batch, n_batch, **params)
 
-    np.testing.assert_allclose(np.array(w_precomputed), np.array(w_convenience), rtol=1e-8)
+    np.testing.assert_allclose(
+        np.array(w_precomputed), np.array(w_convenience), rtol=1e-8
+    )
     np.testing.assert_allclose(np.array(w_precomputed), np.array(w_true), rtol=1e-4)
 
 
@@ -73,8 +75,12 @@ def test_precomputed_inverse_state_can_be_reused():
     refl_a = amsa(w_a, b_n, i_batch, e_batch, n_batch)
     refl_b = amsa(w_b, b_n, i_batch, e_batch, n_batch)
 
-    np.testing.assert_allclose(np.array(invert_amsa_precomputed(refl_a, state)), np.array(w_a), rtol=1e-4)
-    np.testing.assert_allclose(np.array(invert_amsa_precomputed(refl_b, state)), np.array(w_b), rtol=1e-4)
+    np.testing.assert_allclose(
+        np.array(invert_amsa_precomputed(refl_a, state)), np.array(w_a), rtol=1e-4
+    )
+    np.testing.assert_allclose(
+        np.array(invert_amsa_precomputed(refl_b, state)), np.array(w_b), rtol=1e-4
+    )
 
 
 def test_precomputed_inverse_forced_chunking():
@@ -138,8 +144,12 @@ def test_inverse_amsa_masks_nonfinite_reflectance():
     w_precomputed = invert_amsa_precomputed(refl_mixed, state)
 
     finite_idx = np.array([0, 2])
-    np.testing.assert_allclose(np.array(w_direct)[finite_idx], np.array(w_true)[finite_idx], rtol=1e-4)
-    np.testing.assert_allclose(np.array(w_precomputed)[finite_idx], np.array(w_true)[finite_idx], rtol=1e-4)
+    np.testing.assert_allclose(
+        np.array(w_direct)[finite_idx], np.array(w_true)[finite_idx], rtol=1e-4
+    )
+    np.testing.assert_allclose(
+        np.array(w_precomputed)[finite_idx], np.array(w_true)[finite_idx], rtol=1e-4
+    )
     np.testing.assert_allclose(np.array(w_direct[1]), 0.5)
     np.testing.assert_allclose(np.array(w_precomputed[1]), 0.5)
 
@@ -175,34 +185,15 @@ def test_inverse_amsa_hopper():
 
     albedo_sub = albedo[uc, :][:, vc]
 
-    i_flat = np.tile(np.array([np.sin(i_rad), 0, np.cos(i_rad)]), (albedo_sub.size, 1))
-    e_flat = np.tile(np.array([np.sin(e_rad), 0, np.cos(e_rad)]), (albedo_sub.size, 1))
-    n_flat = n[uc, :, :][:, vc, :].reshape(-1, 3)
-    w_flat = albedo_sub.reshape(-1)
-
     b_n = dhg_legendre_coefficients(b, c)
-    a_n = jnp.array(
-        [
-            -0.5,
-            0.1250,
-            -0.0625,
-            0.0391,
-            -0.0273,
-            0.0205,
-            -0.0161,
-            0.0131,
-        ]
-    )
 
     model = Hapke(
         single_scattering_albedo=albedo_sub,
         legendre_coefficients=np.array(b_n),
-        incidence_direction=np.array(
-            [np.sin(i_rad), 0, np.cos(i_rad)]
-        ).reshape(3, 1, 1),
-        emission_direction=np.array(
-            [np.sin(e_rad), 0, np.cos(e_rad)]
-        ).reshape(3, 1, 1),
+        incidence_direction=np.array([np.sin(i_rad), 0, np.cos(i_rad)]).reshape(
+            3, 1, 1
+        ),
+        emission_direction=np.array([np.sin(e_rad), 0, np.cos(e_rad)]).reshape(3, 1, 1),
         surface_orientation=n[uc, :, :][:, vc, :].transpose(2, 0, 1),
         roughness=tb,
         shadow_hiding_h=hs,

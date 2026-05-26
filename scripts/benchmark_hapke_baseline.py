@@ -10,7 +10,12 @@ import numpy as np
 from astropy.io import fits
 
 from refmod.dtm_helper import dtm2grad
-from refmod.hapke import amsa, dhg_legendre_coefficients, invert_amsa_precomputed, prepare_amsa_inversion
+from refmod.hapke import (
+    amsa,
+    dhg_legendre_coefficients,
+    invert_amsa_precomputed,
+    prepare_amsa_inversion,
+)
 from refmod.hapke.inverse import invert_amsa
 
 
@@ -93,17 +98,31 @@ def main():
 
     first_forward, refl = _time_once(lambda: amsa(w, b_n, i, e, n, **params))
     print(f"forward_first: {first_forward:.6f}s")
-    _time_repeated("forward_steady", lambda: amsa(w, b_n, i, e, n, **params), args.repeats)
+    _time_repeated(
+        "forward_steady", lambda: amsa(w, b_n, i, e, n, **params), args.repeats
+    )
 
     first_inverse, w_rec = _time_once(lambda: invert_amsa(refl, b_n, i, e, n, **params))
     print(f"inverse_first: {first_inverse:.6f}s")
-    _time_repeated("inverse_steady", lambda: invert_amsa(refl, b_n, i, e, n, **params), args.repeats)
+    _time_repeated(
+        "inverse_steady",
+        lambda: invert_amsa(refl, b_n, i, e, n, **params),
+        args.repeats,
+    )
 
-    prepare_time, state = _time_once(lambda: prepare_amsa_inversion(b_n, i, e, n, **params))
+    prepare_time, state = _time_once(
+        lambda: prepare_amsa_inversion(b_n, i, e, n, **params)
+    )
     print(f"prepare_inversion: {prepare_time:.6f}s")
-    first_precomputed, w_rec_pre = _time_once(lambda: invert_amsa_precomputed(refl, state))
+    first_precomputed, w_rec_pre = _time_once(
+        lambda: invert_amsa_precomputed(refl, state)
+    )
     print(f"inverse_precomputed_first: {first_precomputed:.6f}s")
-    _time_repeated("inverse_precomputed_steady", lambda: invert_amsa_precomputed(refl, state), args.repeats)
+    _time_repeated(
+        "inverse_precomputed_steady",
+        lambda: invert_amsa_precomputed(refl, state),
+        args.repeats,
+    )
 
     err = float(jnp.nanmax(jnp.abs(w_rec - w)))
     err_pre = float(jnp.nanmax(jnp.abs(w_rec_pre - w)))

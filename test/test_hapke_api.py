@@ -43,8 +43,12 @@ def test_hapke_albedo_inverse_roundtrip_synthetic():
     model = Hapke(
         single_scattering_albedo=ssa,
         legendre_coefficients=np.array(dhg_legendre_coefficients(0.2, 0.6, 12)),
-        incidence_direction=np.array([0.0, np.sin(np.deg2rad(35.0)), np.cos(np.deg2rad(35.0))]),
-        emission_direction=np.array([0.0, np.sin(np.deg2rad(15.0)), np.cos(np.deg2rad(15.0))]),
+        incidence_direction=np.array(
+            [0.0, np.sin(np.deg2rad(35.0)), np.cos(np.deg2rad(35.0))]
+        ),
+        emission_direction=np.array(
+            [0.0, np.sin(np.deg2rad(15.0)), np.cos(np.deg2rad(15.0))]
+        ),
         surface_orientation=np.array([0.0, 0.0, 1.0]),
         model="amsa",
         roughness=np.deg2rad(10.0),
@@ -65,8 +69,12 @@ def test_hapke_albedo_accepts_broadcast_x0():
     model = Hapke(
         single_scattering_albedo=ssa,
         legendre_coefficients=np.array(dhg_legendre_coefficients(0.2, 0.6, 12)),
-        incidence_direction=np.array([0.0, np.sin(np.deg2rad(35.0)), np.cos(np.deg2rad(35.0))]),
-        emission_direction=np.array([0.0, np.sin(np.deg2rad(15.0)), np.cos(np.deg2rad(15.0))]),
+        incidence_direction=np.array(
+            [0.0, np.sin(np.deg2rad(35.0)), np.cos(np.deg2rad(35.0))]
+        ),
+        emission_direction=np.array(
+            [0.0, np.sin(np.deg2rad(15.0)), np.cos(np.deg2rad(15.0))]
+        ),
         surface_orientation=np.array([0.0, 0.0, 1.0]),
         model="amsa",
     )

@@ -14,6 +14,8 @@ from ._core import (
     shadow_hiding,
     value_p,
 )
+
+
 def _refl_amsa_scalar(
     w: jax.Array,
     b_n: jax.Array,
@@ -171,11 +173,7 @@ def _refl_amsa_scalar_and_grad(
     hm0_1 = h_mu0 - 1.0
     hm_1 = h_mu - 1.0
     m = p_mu0 * hm_1 + p_mu * hm0_1 + P * hm0_1 * hm_1
-    dm_dw = (
-        p_mu0 * dh_mu
-        + p_mu * dh_mu0
-        + P * (dh_mu * hm0_1 + dh_mu0 * hm_1)
-    )
+    dm_dw = p_mu0 * dh_mu + p_mu * dh_mu0 + P * (dh_mu * hm0_1 + dh_mu0 * hm_1)
     b_cb = coherent_backscatter(tan_alpha_2, h_cb, b0_cb)
     albedo_indep = mu0 / (mu0 + mu) * s / (4.0 * jnp.pi) * b_cb
     bracket = p_sh + m

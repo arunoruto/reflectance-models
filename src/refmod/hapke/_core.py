@@ -235,10 +235,9 @@ def double_henyey_greenstein(cos_g: jax.Array, b: float, c: float) -> jax.Array:
     ----------
     :cite:p:`Henyey-1941`
     """
-    return (
-        (1.0 + c) / 2.0 * (1.0 - b**2) / (1.0 - 2.0 * b * cos_g + b**2) ** 1.5
-        + (1.0 - c) / 2.0 * (1.0 - b**2) / (1.0 + 2.0 * b * cos_g + b**2) ** 1.5
-    )
+    return (1.0 + c) / 2.0 * (1.0 - b**2) / (1.0 - 2.0 * b * cos_g + b**2) ** 1.5 + (
+        1.0 - c
+    ) / 2.0 * (1.0 - b**2) / (1.0 + 2.0 * b * cos_g + b**2) ** 1.5
 
 
 def cornette_shanks(cos_g: jax.Array, xi: float) -> jax.Array:
@@ -590,28 +589,44 @@ def _roughness_impl(
     f_psi = jnp.exp(-2.0 * sin_psi / (1.0 + cos_psi))
 
     cos_i_s0 = factor * (
-        cos_i + sin_i / cot_rough * _fe2(cot_i, cot_rough) / (2.0 - _fe(cot_i, cot_rough))
+        cos_i
+        + sin_i / cot_rough * _fe2(cot_i, cot_rough) / (2.0 - _fe(cot_i, cot_rough))
     )
     cos_e_s0 = factor * (
-        cos_e + sin_e / cot_rough * _fe2(cot_e, cot_rough) / (2.0 - _fe(cot_e, cot_rough))
+        cos_e
+        + sin_e / cot_rough * _fe2(cot_e, cot_rough) / (2.0 - _fe(cot_e, cot_rough))
     )
 
     ile = cos_i >= cos_e
 
-    def _cos_s_one(cos_x, sin_x, _cos_psi, _psi, _sin_psi_div_2_sq, cot_a, cot_b, cot_c, cot_d):
+    def _cos_s_one(
+        cos_x, sin_x, _cos_psi, _psi, _sin_psi_div_2_sq, cot_a, cot_b, cot_c, cot_d
+    ):
         return factor * (
-            cos_x + sin_x / cot_rough * (
+            cos_x
+            + sin_x
+            / cot_rough
+            * (
                 _cos_psi * _fe2(cot_a, cot_rough)
                 + _sin_psi_div_2_sq * _fe2(cot_b, cot_rough)
-            ) / (2.0 - _fe(cot_c, cot_rough) - _psi / jnp.pi * _fe(cot_d, cot_rough))
+            )
+            / (2.0 - _fe(cot_c, cot_rough) - _psi / jnp.pi * _fe(cot_d, cot_rough))
         )
 
-    cos_i_s_ile = _cos_s_one(cos_i, sin_i, cos_psi, psi, sin_psi_div_2_sq, cot_e, cot_i, cot_e, cot_i)
-    cos_i_s_ige = _cos_s_one(cos_i, sin_i, 1.0, 0.0, -sin_psi_div_2_sq, cot_i, cot_e, cot_i, cot_e)
+    cos_i_s_ile = _cos_s_one(
+        cos_i, sin_i, cos_psi, psi, sin_psi_div_2_sq, cot_e, cot_i, cot_e, cot_i
+    )
+    cos_i_s_ige = _cos_s_one(
+        cos_i, sin_i, 1.0, 0.0, -sin_psi_div_2_sq, cot_i, cot_e, cot_i, cot_e
+    )
     cos_i_s = jnp.where(ile, cos_i_s_ile, cos_i_s_ige)
 
-    cos_e_s_ige = _cos_s_one(cos_e, sin_e, cos_psi, psi, sin_psi_div_2_sq, cot_i, cot_e, cot_i, cot_e)
-    cos_e_s_ile = _cos_s_one(cos_e, sin_e, 1.0, 0.0, -sin_psi_div_2_sq, cot_e, cot_i, cot_e, cot_i)
+    cos_e_s_ige = _cos_s_one(
+        cos_e, sin_e, cos_psi, psi, sin_psi_div_2_sq, cot_i, cot_e, cot_i, cot_e
+    )
+    cos_e_s_ile = _cos_s_one(
+        cos_e, sin_e, 1.0, 0.0, -sin_psi_div_2_sq, cot_e, cot_i, cot_e, cot_i
+    )
     cos_e_s = jnp.where(ile, cos_e_s_ile, cos_e_s_ige)
 
     s = factor * (cos_e_s / cos_e_s0) * (cos_i / cos_i_s0)

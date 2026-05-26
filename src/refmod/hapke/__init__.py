@@ -1,16 +1,20 @@
 from typing import Any, Literal
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.typing as npt
 from pydantic import BaseModel, ConfigDict, Field
 
 from ._core import coef_a, cs_legendre_coefficients, dhg_legendre_coefficients
-from .amsa import amsa
-from .imsa import imsa
-from .inverse import AmsaInversionState, invert_amsa, invert_amsa_precomputed, prepare_amsa_inversion
-from .mimsa import mimsa
+from .amsa import amsa  # noqa: F401
+from .imsa import imsa  # noqa: F401
+from .inverse import (
+    AmsaInversionState,
+    invert_amsa,
+    invert_amsa_precomputed,
+    prepare_amsa_inversion,
+)  # noqa: F401
+from .mimsa import mimsa  # noqa: F401
 
 __all__ = [
     "amsa",
@@ -39,10 +43,18 @@ def _to_flat_vectors(v: np.ndarray) -> np.ndarray:
 
 class Hapke(BaseModel):
     single_scattering_albedo: npt.NDArray | None = Field(default=None)
-    legendre_coefficients: npt.NDArray = Field(default=np.array([1.0, 0.0, 0.5]))
-    incidence_direction: npt.NDArray = Field(default=np.array(0.0))
-    emission_direction: npt.NDArray = Field(default=np.array(0.0))
-    surface_orientation: npt.NDArray = Field(default=np.array([0.0, 0.0, 1.0]))
+    legendre_coefficients: npt.NDArray = Field(
+        default_factory=lambda: np.array([1.0, 0.0, 0.5])
+    )
+    incidence_direction: npt.NDArray = Field(
+        default_factory=lambda: np.array([0.0, 0.0, 1.0])
+    )
+    emission_direction: npt.NDArray = Field(
+        default_factory=lambda: np.array([0.0, 0.0, 1.0])
+    )
+    surface_orientation: npt.NDArray = Field(
+        default_factory=lambda: np.array([0.0, 0.0, 1.0])
+    )
     roughness: float = Field(default=0.0)
     shadow_hiding_h: float = Field(default=0.0)
     shadow_hiding_b0: float = Field(default=0.0)
@@ -77,7 +89,10 @@ class Hapke(BaseModel):
             if s == 1 and t > 1:
                 tile_dims.append((i, t))
         for axis, reps in tile_dims:
-            a = np.tile(np.expand_dims(a, axis=axis), (1,) * axis + (reps,) + (1,) * (a.ndim - axis))
+            a = np.tile(
+                np.expand_dims(a, axis=axis),
+                (1,) * axis + (reps,) + (1,) * (a.ndim - axis),
+            )
         return a
 
     def refl(self) -> npt.NDArray:
@@ -90,7 +105,19 @@ class Hapke(BaseModel):
         n_flat = _to_flat_vectors(np.asarray(self.surface_orientation))
         w_flat = np.ascontiguousarray(ssa).reshape(-1)
 
-        n_pixels = max(i_flat.shape[0], e_flat.shape[0], n_flat.shape[0], w_flat.shape[0])
+        n_pixels = max(
+            i_flat.shape[0], e_flat.shape[0], n_flat.shape[0], w_flat.shape[0]
+        )
+        for name, arr in (
+            ("incidence", i_flat),
+            ("emission", e_flat),
+            ("surface_orientation", n_flat),
+            ("single_scattering_albedo", w_flat),
+        ):
+            if arr.shape[0] not in (1, n_pixels):
+                raise ValueError(
+                    f"{name} has {arr.shape[0]} pixels, expected either 1 or {n_pixels}"
+                )
         w_flat = np.broadcast_to(w_flat, (n_pixels,))
         if i_flat.shape[0] == 1:
             i_flat = np.broadcast_to(i_flat, (n_pixels, 3))
@@ -155,7 +182,19 @@ class Hapke(BaseModel):
         n_flat = _to_flat_vectors(np.asarray(self.surface_orientation))
         refl_flat = np.ascontiguousarray(refl_arr).reshape(-1)
 
-        n_pixels = max(i_flat.shape[0], e_flat.shape[0], n_flat.shape[0], refl_flat.shape[0])
+        n_pixels = max(
+            i_flat.shape[0], e_flat.shape[0], n_flat.shape[0], refl_flat.shape[0]
+        )
+        for name, arr in (
+            ("incidence", i_flat),
+            ("emission", e_flat),
+            ("surface_orientation", n_flat),
+            ("reflectance", refl_flat),
+        ):
+            if arr.shape[0] not in (1, n_pixels):
+                raise ValueError(
+                    f"{name} has {arr.shape[0]} pixels, expected either 1 or {n_pixels}"
+                )
         refl_flat = np.broadcast_to(refl_flat, (n_pixels,))
         if i_flat.shape[0] == 1:
             i_flat = np.broadcast_to(i_flat, (n_pixels, 3))
@@ -164,7 +203,11 @@ class Hapke(BaseModel):
         if n_flat.shape[0] == 1:
             n_flat = np.broadcast_to(n_flat, (n_pixels, 3))
 
-        w0_flat = np.full(n_pixels, 1.0 / 3.0) if x0 is None else np.broadcast_to(np.asarray(x0).reshape(-1), (n_pixels,))
+        w0_flat = (
+            np.full(n_pixels, 1.0 / 3.0)
+            if x0 is None
+            else np.broadcast_to(np.asarray(x0).reshape(-1), (n_pixels,))
+        )
 
         refl_jax = jnp.asarray(refl_flat)
         i_jax = jnp.asarray(i_flat)

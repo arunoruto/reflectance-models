@@ -10,7 +10,9 @@ from astropy.io import fits
 from refmod.dtm_helper import dtm2grad
 from refmod.hapke import amsa as jax_amsa
 from refmod.hapke._core import coef_a as jax_coef_a
-from refmod.hapke._core import dhg_legendre_coefficients as jax_dhg_legendre_coefficients
+from refmod.hapke._core import (
+    dhg_legendre_coefficients as jax_dhg_legendre_coefficients,
+)
 
 
 def load_data():

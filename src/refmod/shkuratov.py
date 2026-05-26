@@ -114,4 +114,6 @@ def shkuratov(
     ----------
     :cite:p:`Shkuratov-2011`
     """
+    if i is None or e is None or n is None:
+        raise ValueError("i, e, and n are required arguments and cannot be None.")
     return _shkuratov_batched(a_n, mu1, eta, i, e, n, m0, mu2)
