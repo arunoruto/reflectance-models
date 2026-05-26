@@ -6,51 +6,82 @@ refmod.hapke.imsa
 
 
 
+
+
 Module Contents
 ---------------
 
-.. py:function:: imsa(single_scattering_albedo, incidence_direction, emission_direction, surface_orientation, phase_function, opposition_effect_h = 0, oppoistion_effect_b0 = 0, roughness = 0)
+.. py:data:: EPS
+   :value: 1e-15
 
-   Calculates reflectance using the IMSA model.
 
-   IMSA stands for Inversion of Multiple Scattering and Absorption.
+.. py:function:: _refl_imsa_scalar(w, b_n, i, e, n, roughness)
 
-   :param single_scattering_albedo: Single scattering albedo, shape (...).
-   :type single_scattering_albedo: npt.NDArray
-   :param incidence_direction: Incidence direction vector(s), shape (..., 3).
-   :type incidence_direction: npt.NDArray
-   :param emission_direction: Emission direction vector(s), shape (..., 3).
-   :type emission_direction: npt.NDArray
-   :param surface_orientation: Surface normal vector(s), shape (..., 3).
-   :type surface_orientation: npt.NDArray
-   :param phase_function: Callable that accepts `cos_alpha` (cosine of phase angle) and
-                          returns phase function values.
-   :type phase_function: Callable[[npt.NDArray], npt.NDArray]
-   :param opposition_effect_h: Opposition effect parameter h, by default 0.
-   :type opposition_effect_h: float, optional
-   :param oppoistion_effect_b0: Opposition effect parameter B0 (b_zero), by default 0.
-                                Note: Original argument name `oppoistion_effect_b0` kept for API compatibility.
-   :type oppoistion_effect_b0: float, optional
-   :param roughness: Surface roughness parameter, by default 0.
+   IMSA reflectance for a single pixel.
+
+   Simplest Hapke model: isotropic multiple scattering with a Legendre
+   polynomial phase function for single scattering.  No opposition effects
+   (SHOE, CBOE) are included.
+
+   :param w: Single scattering albedo (scalar).
+   :type w: jax.Array
+   :param b_n: Legendre polynomial coefficients for the single-scattering phase
+               function.  Shape ``(n_coeffs,)``.
+   :type b_n: jax.Array
+   :param i: Incidence (illumination) direction vector.  Shape ``(3,)``.
+   :type i: jax.Array
+   :param e: Emission (viewing) direction vector.  Shape ``(3,)``.
+   :type e: jax.Array
+   :param n: Surface normal vector.  Shape ``(3,)``.
+   :type n: jax.Array
+   :param roughness: Macroscopic roughness angle in radians, :math:`\bar{\theta}`.
+   :type roughness: float
+
+   :returns: Reflectance (scalar).  Pixels with the source or detector behind the
+             local horizon are set to NaN.
+   :rtype: jax.Array
+
+   .. rubric:: References
+
+   .. bibliography::
+      :filter: False
+
+      Hapke-2012
+
+
+.. py:data:: _imsa_batched
+
+.. py:function:: imsa(w, b_n, i, e, n, roughness = 0.0)
+
+   Batched IMSA reflectance.
+
+   Vectorised wrapper around :func:`_refl_imsa_scalar` that evaluates the
+   isotropic multiple-scattering Hapke model for an arbitrary number of
+   pixels sharing the same Legendre coefficients and roughness.
+
+   :param w: Single scattering albedo per pixel.  Shape ``(n_pixels,)``.
+   :type w: jax.Array
+   :param b_n: Legendre polynomial coefficients.  Shape ``(n_coeffs,)``.
+   :type b_n: jax.Array
+   :param i: Incidence direction vectors.  Shape ``(n_pixels, 3)``.
+   :type i: jax.Array
+   :param e: Emission direction vectors.  Shape ``(n_pixels, 3)``.
+   :type e: jax.Array
+   :param n: Surface normal vectors.  Shape ``(n_pixels, 3)``.
+   :type n: jax.Array
+   :param roughness: Macroscopic roughness angle in radians, :math:`\bar{\theta}`.
+                     Default is 0.0.
    :type roughness: float, optional
 
-   :returns: Calculated reflectance values, shape (...).
-   :rtype: npt.NDArray
+   :returns: Reflectance per pixel.  Shape ``(n_pixels,)``.  Pixels where the
+             source or detector is behind the local horizon are returned as NaN.
+   :rtype: jax.Array
 
-   :raises Exception: If any calculated reflectance value has a significant imaginary part.
+   .. rubric:: References
 
-   .. rubric:: Notes
+   .. bibliography::
+      :filter: False
 
-   - Input arrays `incidence_direction`, `emission_direction`,
-     `surface_orientation`, and `single_scattering_albedo` are expected to
-     broadcast together.
-   - The `phase_function` should be vectorized to handle arrays of `cos_alpha`.
-   - The IMSA model accounts for multiple scattering and absorption.
-
-   References
-
-   ----------
-
-   [IMSAModelPlaceholder]
+      Hapke-2012
 
 

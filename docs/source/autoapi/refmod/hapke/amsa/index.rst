@@ -6,145 +6,277 @@ refmod.hapke.amsa
 
 
 
+
+
 Module Contents
 ---------------
 
-.. py:function:: __amsa_preprocess(single_scattering_albedo, incidence_direction, emission_direction, surface_orientation, phase_function_type, b_n = None, a_n = None, roughness = 0.0, hs = 0.0, bs0 = 0.0, hc = 0.0, bc0 = 0.0, phase_function_args = ())
+.. py:data:: EPS
+   :value: 1e-15
 
-   Preprocesses the inputs for the AMSA model.
 
-   :param single_scattering_albedo: Single scattering albedo.
-   :type single_scattering_albedo: npt.NDArray
-   :param incidence_direction: Incidence direction vector(s) of shape (..., 3).
-   :type incidence_direction: npt.NDArray
-   :param emission_direction: Emission direction vector(s) of shape (..., 3).
-   :type emission_direction: npt.NDArray
-   :param surface_orientation: Surface orientation vector(s) of shape (..., 3).
-   :type surface_orientation: npt.NDArray
-   :param phase_function_type: Type of phase function to use.
-   :type phase_function_type: PhaseFunctionType
-   :param b_n: Coefficients of the Legendre expansion.
-   :type b_n: npt.NDArray
-   :param a_n: Coefficients of the Legendre expansion.
-   :type a_n: npt.NDArray
-   :param roughness: Surface roughness, by default 0.0.
+.. py:function:: _refl_amsa_scalar(w, b_n, i, e, n, roughness, h_sh, b0_sh, h_cb, b0_cb, a_n = None)
+
+   Compute AMSA reflectance for a single pixel (scalar w, 3-vectors).
+
+   Full anisotropic multiple scattering with shadow hiding and coherent
+   backscatter. Handles a single pixel with scalar single-scattering albedo
+   and 3-vector incidence, emission, and normal directions.
+
+   :param w: Single-scattering albedo (scalar).
+   :type w: Array
+   :param b_n: Legendre coefficients of the single-particle phase function, shape (N,).
+   :type b_n: Array
+   :param i: Incidence direction vector, shape (3,).
+   :type i: Array
+   :param e: Emission direction vector, shape (3,).
+   :type e: Array
+   :param n: Surface normal vector, shape (3,).
+   :type n: Array
+   :param roughness: Surface roughness angle in radians.
+   :type roughness: float
+   :param h_sh: Shadow-hiding angular width parameter.
+   :type h_sh: float
+   :param b0_sh: Shadow-hiding opposition amplitude.
+   :type b0_sh: float
+   :param h_cb: Coherent backscatter angular width parameter.
+   :type h_cb: float
+   :param b0_cb: Coherent backscatter opposition amplitude.
+   :type b0_cb: float
+   :param a_n: Precomputed Legendre expansion of the Henyey-Greenstein phase function
+               coefficients. Computed from ``b_n`` if None.
+   :type a_n: Array or None, optional
+
+   :returns: Reflectance value (scalar). NaN if mu0 <= 0 or mu <= 0.
+   :rtype: Array
+
+   .. rubric:: References
+
+   :cite:p:`Hapke-1984`
+   :cite:p:`Hapke-2002`
+   :cite:p:`Hapke-2012`
+
+
+.. py:function:: _refl_amsa_scalar_and_grad(w, b_n, i, e, n, roughness, h_sh, b0_sh, h_cb, b0_cb, a_n = None)
+
+   Compute AMSA reflectance and its analytical derivative dR/dw for a single pixel.
+
+   Full anisotropic multiple scattering with shadow hiding and coherent
+   backscatter. Returns both reflectance and derivative with respect to the
+   single-scattering albedo w, useful for Levenberg-Marquardt optimization.
+
+   :param w: Single-scattering albedo (scalar).
+   :type w: Array
+   :param b_n: Legendre coefficients of the single-particle phase function, shape (N,).
+   :type b_n: Array
+   :param i: Incidence direction vector, shape (3,).
+   :type i: Array
+   :param e: Emission direction vector, shape (3,).
+   :type e: Array
+   :param n: Surface normal vector, shape (3,).
+   :type n: Array
+   :param roughness: Surface roughness angle in radians.
+   :type roughness: float
+   :param h_sh: Shadow-hiding angular width parameter.
+   :type h_sh: float
+   :param b0_sh: Shadow-hiding opposition amplitude.
+   :type b0_sh: float
+   :param h_cb: Coherent backscatter angular width parameter.
+   :type h_cb: float
+   :param b0_cb: Coherent backscatter opposition amplitude.
+   :type b0_cb: float
+   :param a_n: Precomputed Legendre expansion of the Henyey-Greenstein phase function
+               coefficients. Computed from ``b_n`` if None.
+   :type a_n: Array or None, optional
+
+   :returns: Reflectance value (scalar) and derivative dR/dw (scalar).
+             Reflectance is NaN and derivative is 0.0 if mu0 <= 0 or mu <= 0.
+   :rtype: tuple[Array, Array]
+
+   .. rubric:: References
+
+   :cite:p:`Hapke-1984`
+   :cite:p:`Hapke-2002`
+   :cite:p:`Hapke-2012`
+
+
+.. py:function:: _precompute_amsa_scalar(b_n, i, e, n, roughness, h_sh, b0_sh, h_cb, b0_cb, a_n = None)
+
+   Precompute all w-independent quantities for fast LM iteration.
+
+   Computes roughness correction, Legendre expansion, single-particle phase
+   function, shadow hiding, coherent backscatter, and the albedo-independent
+   prefactor. The returned dict can be reused with
+   ``_fast_refl_amsa_scalar`` and ``_fast_refl_amsa_scalar_and_grad``
+   to avoid recomputing these quantities when only w varies.
+
+   :param b_n: Legendre coefficients of the single-particle phase function, shape (N,).
+   :type b_n: Array
+   :param i: Incidence direction vector, shape (3,).
+   :type i: Array
+   :param e: Emission direction vector, shape (3,).
+   :type e: Array
+   :param n: Surface normal vector, shape (3,).
+   :type n: Array
+   :param roughness: Surface roughness angle in radians.
+   :type roughness: float
+   :param h_sh: Shadow-hiding angular width parameter.
+   :type h_sh: float
+   :param b0_sh: Shadow-hiding opposition amplitude.
+   :type b0_sh: float
+   :param h_cb: Coherent backscatter angular width parameter.
+   :type h_cb: float
+   :param b0_cb: Coherent backscatter opposition amplitude.
+   :type b0_cb: float
+   :param a_n: Precomputed Legendre expansion of the Henyey-Greenstein phase function
+               coefficients. Computed from ``b_n`` if None.
+   :type a_n: Array or None, optional
+
+   :returns: Dictionary of precomputed values with keys ``albedo_indep``, ``p_sh``,
+             ``p_mu0``, ``p_mu``, ``P``, ``mu0``, ``mu``, ``valid``.
+   :rtype: dict
+
+   .. rubric:: References
+
+   :cite:p:`Hapke-1984`
+   :cite:p:`Hapke-2002`
+   :cite:p:`Hapke-2012`
+
+
+.. py:function:: _fast_refl_amsa_scalar(w, pre)
+
+   Compute AMSA reflectance using precomputed state.
+
+   Only recomputes the H-functions and the multiple scattering term M.
+   Uses precomputed w-independent quantities from
+   ``_precompute_amsa_scalar`` for faster evaluation during
+   Levenberg-Marquardt iterations.
+
+   :param w: Single-scattering albedo (scalar).
+   :type w: Array
+   :param pre: Precomputed state dict from ``_precompute_amsa_scalar``.
+   :type pre: dict
+
+   :returns: Reflectance value (scalar). NaN if not valid.
+   :rtype: Array
+
+   .. rubric:: References
+
+   :cite:p:`Hapke-2012`
+
+
+.. py:function:: _fast_refl_amsa_scalar_and_grad(w, pre)
+
+   Compute AMSA reflectance and analytical derivative dR/dw using precomputed state.
+
+   Only recomputes the H-functions, their derivatives, and the multiple
+   scattering term. Uses precomputed w-independent quantities from
+   ``_precompute_amsa_scalar`` for faster evaluation during
+   Levenberg-Marquardt iterations.
+
+   :param w: Single-scattering albedo (scalar).
+   :type w: Array
+   :param pre: Precomputed state dict from ``_precompute_amsa_scalar``.
+   :type pre: dict
+
+   :returns: Reflectance value (scalar) and derivative dR/dw (scalar).
+             Reflectance is NaN and derivative is 0.0 if not valid.
+   :rtype: tuple[Array, Array]
+
+   .. rubric:: References
+
+   :cite:p:`Hapke-2012`
+
+
+.. py:data:: _precompute_amsa_batched
+
+.. py:data:: _fast_refl_amsa_batched
+   :value: None
+
+
+.. py:data:: _fast_refl_amsa_and_grad_batched
+   :value: None
+
+
+.. py:function:: precompute_amsa(b_n, i, e, n, roughness = 0.0, h_sh = 0.0, b0_sh = 0.0, h_cb = 0.0, b0_cb = 0.0, a_n = None)
+
+   Precompute w-independent quantities for batched (N, 3) inputs.
+
+   ``jax.vmap``-wrapped version of ``_precompute_amsa_scalar`` across the
+   pixel dimension. ``b_n`` is broadcast across all pixels.
+
+   :param b_n: Legendre coefficients of the single-particle phase function, shape (N,).
+   :type b_n: Array
+   :param i: Incidence direction vectors, shape (M, 3).
+   :type i: Array
+   :param e: Emission direction vectors, shape (M, 3).
+   :type e: Array
+   :param n: Surface normal vectors, shape (M, 3).
+   :type n: Array
+   :param roughness: Surface roughness angle in radians. Default is 0.0.
    :type roughness: float, optional
-   :param hs: Shadowing parameter, by default 0.0.
-   :type hs: float, optional
-   :param bs0: Shadowing parameter, by default 0.0.
-   :type bs0: float, optional
-   :param hc: Coherent backscattering parameter, by default 0.0.
-   :type hc: float, optional
-   :param bc0: Coherent backscattering parameter, by default 0.0.
-   :type bc0: float, optional
-   :param phase_function_args: Additional arguments for the phase function, by default ().
-   :type phase_function_args: tuple, optional
+   :param h_sh: Shadow-hiding angular width parameter. Default is 0.0.
+   :type h_sh: float, optional
+   :param b0_sh: Shadow-hiding opposition amplitude. Default is 0.0.
+   :type b0_sh: float, optional
+   :param h_cb: Coherent backscatter angular width parameter. Default is 0.0.
+   :type h_cb: float, optional
+   :param b0_cb: Coherent backscatter opposition amplitude. Default is 0.0.
+   :type b0_cb: float, optional
 
-   :returns:
+   :returns: Dictionary of batched precomputed values with keys ``albedo_indep``,
+             ``p_sh``, ``p_mu0``, ``p_mu``, ``P``, ``mu0``, ``mu``, ``valid``.
+             Each value has an added leading batch dimension.
+   :rtype: dict
 
-             A tuple containing:
-                 - albedo_independent : npt.NDArray
-                     Albedo-independent term.
-                 - mu_0 : npt.NDArray
-                     Cosine of the incidence angle.
-                 - mu : npt.NDArray
-                     Cosine of the emission angle.
-                 - p_g : npt.NDArray
-                     Phase function values.
-                 - m : npt.NDArray
-                     M term.
-                 - p_mu_0 : npt.NDArray
-                     Legendre polynomial values for mu_0.
-                 - p_mu : npt.NDArray
-                     Legendre polynomial values for mu.
-                 - p : npt.NDArray
-                     Legendre polynomial values.
-                 - h_mu_0 : npt.NDArray
-                     H-function values for mu_0.
-                 - h_mu : npt.NDArray
-                     H-function values for mu.
-   :rtype: tuple
+   .. rubric:: References
+
+   :cite:p:`Hapke-1984`
+   :cite:p:`Hapke-2002`
+   :cite:p:`Hapke-2012`
 
 
-.. py:function:: amsa(single_scattering_albedo, incidence_direction, emission_direction, surface_orientation, phase_function_type, b_n = None, a_n = None, hs = 0, bs0 = 0, roughness = 0, hc = 0, bc0 = 0, phase_function_args = (), refl_optimization = None)
+.. py:data:: _amsa_batched
 
-   Calculates the reflectance using the AMSA model.
+.. py:function:: amsa(w, b_n, i, e, n, roughness = 0.0, h_sh = 0.0, b0_sh = 0.0, h_cb = 0.0, b0_cb = 0.0, a_n = None)
 
-   :param single_scattering_albedo: Single scattering albedo.
-   :type single_scattering_albedo: npt.NDArray
-   :param incidence_direction: Incidence direction vector(s) of shape (..., 3).
-   :type incidence_direction: npt.NDArray
-   :param emission_direction: Emission direction vector(s) of shape (..., 3).
-   :type emission_direction: npt.NDArray
-   :param surface_orientation: Surface orientation vector(s) of shape (..., 3).
-   :type surface_orientation: npt.NDArray
-   :param phase_function_type: Type of phase function to use.
-   :type phase_function_type: PhaseFunctionType
-   :param b_n: Coefficients of the Legendre expansion.
-   :type b_n: npt.NDArray
-   :param a_n: Coefficients of the Legendre expansion.
-   :type a_n: npt.NDArray
-   :param hs: Shadowing parameter, by default 0.
-   :type hs: float, optional
-   :param bs0: Shadowing parameter, by default 0.
-   :type bs0: float, optional
-   :param roughness: Surface roughness, by default 0.
+   Public batched AMSA reflectance model.
+
+   Full anisotropic multiple scattering with shadow hiding and coherent
+   backscatter. Computes reflectance for a batch of pixels with scalar w,
+   broadcast Legendre coefficients ``b_n``, and batched geometry vectors.
+
+   :param w: Single-scattering albedo (scalar, broadcast across pixels).
+   :type w: Array
+   :param b_n: Legendre coefficients of the single-particle phase function, shape (N,).
+   :type b_n: Array
+   :param i: Incidence direction vectors, shape (M, 3).
+   :type i: Array
+   :param e: Emission direction vectors, shape (M, 3).
+   :type e: Array
+   :param n: Surface normal vectors, shape (M, 3).
+   :type n: Array
+   :param roughness: Surface roughness angle in radians. Default is 0.0.
    :type roughness: float, optional
-   :param hc: Coherent backscattering parameter, by default 0.
-   :type hc: float, optional
-   :param bc0: Coherent backscattering parameter, by default 0.
-   :type bc0: float, optional
-   :param phase_function_args: Additional arguments for the phase function, by default ().
-   :type phase_function_args: tuple, optional
-   :param refl_optimization: Reflectance optimization array, by default None.
-   :type refl_optimization: npt.NDArray | None, optional
+   :param h_sh: Shadow-hiding angular width parameter. Default is 0.0.
+   :type h_sh: float, optional
+   :param b0_sh: Shadow-hiding opposition amplitude. Default is 0.0.
+   :type b0_sh: float, optional
+   :param h_cb: Coherent backscatter angular width parameter. Default is 0.0.
+   :type h_cb: float, optional
+   :param b0_cb: Coherent backscatter opposition amplitude. Default is 0.0.
+   :type b0_cb: float, optional
+   :param a_n: Precomputed Legendre expansion of the Henyey-Greenstein phase function
+               coefficients. Computed from ``b_n`` if None.
+   :type a_n: Array or None, optional
 
-   :returns: Reflectance values.
-   :rtype: npt.NDArray
+   :returns: Reflectance values, shape (M,). NaN where mu0 <= 0 or mu <= 0.
+   :rtype: Array
 
-   :raises Exception: If at least one reflectance value is not real.
-   :raises References:
-   :raises ----------:
-   :raises [AMSAModelPlaceholder]:
+   .. rubric:: References
 
-
-.. py:function:: amsa_derivative(single_scattering_albedo, incidence_direction, emission_direction, surface_orientation, phase_function_type, b_n = None, a_n = None, roughness = 0, hs = 0, bs0 = 0, hc = 0, bc0 = 0, phase_function_args = (), refl_optimization = None)
-
-   Calculates the derivative of the reflectance using the AMSA model.
-
-   :param single_scattering_albedo: Single scattering albedo.
-   :type single_scattering_albedo: npt.NDArray
-   :param incidence_direction: Incidence direction vector(s) of shape (..., 3).
-   :type incidence_direction: npt.NDArray
-   :param emission_direction: Emission direction vector(s) of shape (..., 3).
-   :type emission_direction: npt.NDArray
-   :param surface_orientation: Surface orientation vector(s) of shape (..., 3).
-   :type surface_orientation: npt.NDArray
-   :param phase_function_type: Type of phase function to use.
-   :type phase_function_type: PhaseFunctionType
-   :param b_n: Coefficients of the Legendre expansion.
-   :type b_n: npt.NDArray
-   :param a_n: Coefficients of the Legendre expansion.
-   :type a_n: npt.NDArray
-   :param roughness: Surface roughness, by default 0.
-   :type roughness: float, optional
-   :param hs: Shadowing parameter, by default 0.
-   :type hs: float, optional
-   :param bs0: Shadowing parameter, by default 0.
-   :type bs0: float, optional
-   :param hc: Coherent backscattering parameter, by default 0.
-   :type hc: float, optional
-   :param bc0: Coherent backscattering parameter, by default 0.
-   :type bc0: float, optional
-   :param phase_function_args: Additional arguments for the phase function, by default ().
-   :type phase_function_args: tuple, optional
-   :param refl_optimization: Reflectance optimization array, by default None.
-                             This parameter is not used in the derivative calculation.
-   :type refl_optimization: npt.NDArray | None, optional
-
-   :returns: * *npt.NDArray* -- Derivative of the reflectance with respect to single scattering albedo.
-             * *References*
-             * *----------*
-             * *[AMSAModelPlaceholder]*
+   :cite:p:`Hapke-1984`
+   :cite:p:`Hapke-2002`
+   :cite:p:`Hapke-2012`
 
 

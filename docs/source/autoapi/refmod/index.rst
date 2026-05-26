@@ -10,9 +10,15 @@ Submodules
 .. toctree::
    :maxdepth: 1
 
+   /autoapi/refmod/config/index
    /autoapi/refmod/dtm_helper/index
    /autoapi/refmod/hapke/index
-   /autoapi/refmod/inverse/index
+   /autoapi/refmod/lambert/index
+   /autoapi/refmod/mixing/index
+   /autoapi/refmod/shkuratov/index
+   /autoapi/refmod/utils/index
+
+
 
 
 
@@ -113,33 +119,31 @@ Package Contents
 
 
    .. py:attribute:: single_scattering_albedo
-      :type:  numpy.typing.NDArray
-
-
-   .. py:attribute:: incidence_direction
-      :type:  numpy.typing.NDArray
-
-
-   .. py:attribute:: emission_direction
-      :type:  numpy.typing.NDArray
-
-
-   .. py:attribute:: surface_orientation
-      :type:  numpy.typing.NDArray
-
-
-   .. py:attribute:: phase_function
-      :type:  Callable[[numpy.typing.NDArray], numpy.typing.NDArray]
-
-
-   .. py:attribute:: opposition_effect_h
-      :type:  float
+      :type:  numpy.typing.NDArray | None
       :value: None
 
 
 
-   .. py:attribute:: oppoistion_effect_b0
-      :type:  float
+   .. py:attribute:: legendre_coefficients
+      :type:  numpy.typing.NDArray
+      :value: None
+
+
+
+   .. py:attribute:: incidence_direction
+      :type:  numpy.typing.NDArray
+      :value: None
+
+
+
+   .. py:attribute:: emission_direction
+      :type:  numpy.typing.NDArray
+      :value: None
+
+
+
+   .. py:attribute:: surface_orientation
+      :type:  numpy.typing.NDArray
       :value: None
 
 
@@ -150,8 +154,115 @@ Package Contents
 
 
 
+   .. py:attribute:: shadow_hiding_h
+      :type:  float
+      :value: None
+
+
+
+   .. py:attribute:: shadow_hiding_b0
+      :type:  float
+      :value: None
+
+
+
+   .. py:attribute:: coherent_backscattering_h
+      :type:  float
+      :value: None
+
+
+
+   .. py:attribute:: coherent_backscattering_b0
+      :type:  float
+      :value: None
+
+
+
+   .. py:attribute:: model
+      :type:  Literal['amsa', 'imsa', 'mimsa']
+      :value: None
+
+
+
    .. py:attribute:: model_config
 
       Configuration for the model, should be a dictionary conforming to [`ConfigDict`][pydantic.config.ConfigDict].
+
+
+   .. py:method:: model_post_init(__context)
+
+      Override this method to perform additional initialization after `__init__` and `model_construct`.
+      This is useful if you want to do some validation that requires the entire model to be initialized.
+
+
+
+   .. py:method:: _broadcast_to_shape(a, target_shape)
+      :staticmethod:
+
+
+
+   .. py:method:: refl()
+
+
+   .. py:method:: albedo(reflectance, x0 = None)
+
+
+.. py:function:: lambert(w, i, e, n)
+
+   Batched Lambert reflectance model.
+
+   The model is view-independent — the emission direction *e* is accepted
+   for API consistency but ignored.
+
+   :param w: Single scattering albedo per pixel.  Shape ``(n_pixels,)``.
+   :type w: jax.Array
+   :param i: Incidence direction vectors.  Shape ``(n_pixels, 3)``.
+   :type i: jax.Array
+   :param e: Emission direction vectors (unused).  Shape ``(n_pixels, 3)``.
+   :type e: jax.Array
+   :param n: Surface normal vectors.  Shape ``(n_pixels, 3)``.
+   :type n: jax.Array
+
+   :returns: Reflectance per pixel.  Shape ``(n_pixels,)``.
+   :rtype: jax.Array
+
+
+.. py:function:: shkuratov(a_n, mu1 = 0.0, eta = 0.0, i = None, e = None, n = None, m0 = 0.0, mu2 = 0.0)
+
+   Shkuratov photometric model with the Akimov disk function.
+
+   Reflectance is computed as
+
+   .. math::
+
+      r = A_n \, \frac{\phi(\alpha) \, D(\alpha, \beta, \gamma)}{\cos i}
+
+   where :math:`\phi(\alpha)` is the phase function and
+   :math:`D(\alpha, \beta, \gamma)` is the Akimov disk function.
+
+   :param a_n: Normal albedo per pixel.  Shape ``(n_pixels,)``.
+   :type a_n: jax.Array
+   :param mu1: Roughness parameter (exponential phase term).  Default is 0.0.
+   :type mu1: float, optional
+   :param eta: Fractal deviation parameter controlling the limb-darkening exponent.
+               Default is 0.0.
+   :type eta: float, optional
+   :param i: Incidence direction vectors.  Shape ``(n_pixels, 3)``.
+   :type i: jax.Array or None, optional
+   :param e: Emission direction vectors.  Shape ``(n_pixels, 3)``.
+   :type e: jax.Array or None, optional
+   :param n: Surface normal vectors.  Shape ``(n_pixels, 3)``.
+   :type n: jax.Array or None, optional
+   :param m0: Opposition surge amplitude.  Default is 0.0 (no opposition effect).
+   :type m0: float, optional
+   :param mu2: Opposition surge width.  Default is 0.0.
+   :type mu2: float, optional
+
+   :returns: Reflectance per pixel.  Shape ``(n_pixels,)``.
+   :rtype: jax.Array
+
+   .. rubric:: References
+
+   :cite:p:`Shkuratov-2011`
 
 
