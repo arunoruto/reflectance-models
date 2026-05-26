@@ -6,14 +6,8 @@ refmod.hapke._core
 
 
 
-
-
 Module Contents
 ---------------
-
-.. py:data:: EPS
-   :value: 1e-15
-
 
 .. py:function:: normalize(v)
 
