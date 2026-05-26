@@ -10,9 +10,10 @@ Submodules
 .. toctree::
    :maxdepth: 1
 
+   /autoapi/refmod/hapke/_core/index
    /autoapi/refmod/hapke/amsa/index
-   /autoapi/refmod/hapke/functions/index
    /autoapi/refmod/hapke/imsa/index
+   /autoapi/refmod/hapke/inverse/index
    /autoapi/refmod/hapke/mimsa/index
 
 
@@ -23,91 +24,315 @@ Submodules
 Package Contents
 ----------------
 
-.. py:function:: amsa(single_scattering_albedo, incidence_direction, emission_direction, surface_orientation, phase_function_type, b_n = None, a_n = None, hs = 0, bs0 = 0, roughness = 0, hc = 0, bc0 = 0, phase_function_args = (), refl_optimization = None)
+.. py:function:: coef_a(n = 15)
 
-   Calculates the reflectance using the AMSA model.
+   Legendre expansion coefficients :math:`a_n` for the Hapke phase function.
 
-   :param single_scattering_albedo: Single scattering albedo.
-   :type single_scattering_albedo: npt.NDArray
-   :param incidence_direction: Incidence direction vector(s) of shape (..., 3).
-   :type incidence_direction: npt.NDArray
-   :param emission_direction: Emission direction vector(s) of shape (..., 3).
-   :type emission_direction: npt.NDArray
-   :param surface_orientation: Surface orientation vector(s) of shape (..., 3).
-   :type surface_orientation: npt.NDArray
-   :param phase_function_type: Type of phase function to use.
-   :type phase_function_type: PhaseFunctionType
-   :param b_n: Coefficients of the Legendre expansion.
-   :type b_n: npt.NDArray
-   :param a_n: Coefficients of the Legendre expansion.
-   :type a_n: npt.NDArray
-   :param hs: Shadowing parameter, by default 0.
-   :type hs: float, optional
-   :param bs0: Shadowing parameter, by default 0.
-   :type bs0: float, optional
-   :param roughness: Surface roughness, by default 0.
+   Computes the coefficients defined by Hapke (2002, Eq. 27):
+
+   .. math::
+
+       a_n = \begin{cases}
+           0, & n = 0, 2, 4, \ldots \\
+           -\frac{1}{2}, & n = 1 \\
+           \frac{2 - n}{n + 1} a_{n-2}, & n = 3, 5, 7, \ldots
+       \end{cases}
+
+   :param n: Number of coefficients to compute (default 15). Returns *n+1* values
+             indexed 0 through *n*.
+   :type n: int, optional
+
+   :returns: Array of :math:`a_n` coefficients of length *n+1*.
+   :rtype: jax.Array
+
+   .. rubric:: References
+
+   :cite:p:`Hapke-2002`
+
+
+.. py:function:: cs_legendre_coefficients(xi, n = 15)
+
+   Legendre expansion coefficients for the Cornette–Shanks phase function.
+
+   :param xi: Asymmetry parameter :math:`\xi`.
+   :type xi: float
+   :param n: Number of coefficients to compute (default 15). Returns *n+1* values.
+   :type n: int, optional
+
+   :returns: Array of Legendre coefficients :math:`b_n` of length *n+1*.
+   :rtype: jax.Array
+
+   .. rubric:: References
+
+   :cite:p:`Cornette-1992`
+
+
+.. py:function:: dhg_legendre_coefficients(b, c, n = 15)
+
+   Legendre expansion coefficients for the Double Henyey–Greenstein phase function.
+
+   Computes the coefficients :math:`b_n`:
+
+   .. math::
+
+       b_n = \begin{cases}
+           (2n + 1) b^n, & n \text{ even} \\
+           c (2n + 1) b^n, & n \text{ odd}
+       \end{cases}
+
+   :param b: Asymmetry parameter.
+   :type b: float
+   :param c: Backscatter fraction.
+   :type c: float
+   :param n: Number of coefficients to compute (default 15). Returns *n+1* values.
+   :type n: int, optional
+
+   :returns: Array of Legendre coefficients :math:`b_n` of length *n+1*.
+   :rtype: jax.Array
+
+   .. rubric:: References
+
+   :cite:p:`Henyey-1941`
+
+
+.. py:function:: amsa(w, b_n, i, e, n, roughness = 0.0, h_sh = 0.0, b0_sh = 0.0, h_cb = 0.0, b0_cb = 0.0, a_n = None)
+
+   Public batched AMSA reflectance model.
+
+   Full anisotropic multiple scattering with shadow hiding and coherent
+   backscatter. Computes reflectance for a batch of pixels with scalar w,
+   broadcast Legendre coefficients ``b_n``, and batched geometry vectors.
+
+   :param w: Single-scattering albedo (scalar, broadcast across pixels).
+   :type w: Array
+   :param b_n: Legendre coefficients of the single-particle phase function, shape (N,).
+   :type b_n: Array
+   :param i: Incidence direction vectors, shape (M, 3).
+   :type i: Array
+   :param e: Emission direction vectors, shape (M, 3).
+   :type e: Array
+   :param n: Surface normal vectors, shape (M, 3).
+   :type n: Array
+   :param roughness: Surface roughness angle in radians. Default is 0.0.
    :type roughness: float, optional
-   :param hc: Coherent backscattering parameter, by default 0.
-   :type hc: float, optional
-   :param bc0: Coherent backscattering parameter, by default 0.
-   :type bc0: float, optional
-   :param phase_function_args: Additional arguments for the phase function, by default ().
-   :type phase_function_args: tuple, optional
-   :param refl_optimization: Reflectance optimization array, by default None.
-   :type refl_optimization: npt.NDArray | None, optional
+   :param h_sh: Shadow-hiding angular width parameter. Default is 0.0.
+   :type h_sh: float, optional
+   :param b0_sh: Shadow-hiding opposition amplitude. Default is 0.0.
+   :type b0_sh: float, optional
+   :param h_cb: Coherent backscatter angular width parameter. Default is 0.0.
+   :type h_cb: float, optional
+   :param b0_cb: Coherent backscatter opposition amplitude. Default is 0.0.
+   :type b0_cb: float, optional
+   :param a_n: Precomputed Legendre expansion of the Henyey-Greenstein phase function
+               coefficients. Computed from ``b_n`` if None.
+   :type a_n: Array or None, optional
 
-   :returns: Reflectance values.
-   :rtype: npt.NDArray
+   :returns: Reflectance values, shape (M,). NaN where mu0 <= 0 or mu <= 0.
+   :rtype: Array
 
-   :raises Exception: If at least one reflectance value is not real.
-   :raises References:
-   :raises ----------:
-   :raises [AMSAModelPlaceholder]:
+   .. rubric:: References
+
+   :cite:p:`Hapke-1984`
+   :cite:p:`Hapke-2002`
+   :cite:p:`Hapke-2012`
 
 
-.. py:function:: imsa(single_scattering_albedo, incidence_direction, emission_direction, surface_orientation, phase_function, opposition_effect_h = 0, oppoistion_effect_b0 = 0, roughness = 0)
+.. py:function:: imsa(w, b_n, i, e, n, roughness = 0.0)
 
-   Calculates reflectance using the IMSA model.
+   Batched IMSA reflectance.
 
-   IMSA stands for Inversion of Multiple Scattering and Absorption.
+   Vectorised wrapper around :func:`_refl_imsa_scalar` that evaluates the
+   isotropic multiple-scattering Hapke model for an arbitrary number of
+   pixels sharing the same Legendre coefficients and roughness.
 
-   :param single_scattering_albedo: Single scattering albedo, shape (...).
-   :type single_scattering_albedo: npt.NDArray
-   :param incidence_direction: Incidence direction vector(s), shape (..., 3).
-   :type incidence_direction: npt.NDArray
-   :param emission_direction: Emission direction vector(s), shape (..., 3).
-   :type emission_direction: npt.NDArray
-   :param surface_orientation: Surface normal vector(s), shape (..., 3).
-   :type surface_orientation: npt.NDArray
-   :param phase_function: Callable that accepts `cos_alpha` (cosine of phase angle) and
-                          returns phase function values.
-   :type phase_function: Callable[[npt.NDArray], npt.NDArray]
-   :param opposition_effect_h: Opposition effect parameter h, by default 0.
-   :type opposition_effect_h: float, optional
-   :param oppoistion_effect_b0: Opposition effect parameter B0 (b_zero), by default 0.
-                                Note: Original argument name `oppoistion_effect_b0` kept for API compatibility.
-   :type oppoistion_effect_b0: float, optional
-   :param roughness: Surface roughness parameter, by default 0.
+   :param w: Single scattering albedo per pixel.  Shape ``(n_pixels,)``.
+   :type w: jax.Array
+   :param b_n: Legendre polynomial coefficients.  Shape ``(n_coeffs,)``.
+   :type b_n: jax.Array
+   :param i: Incidence direction vectors.  Shape ``(n_pixels, 3)``.
+   :type i: jax.Array
+   :param e: Emission direction vectors.  Shape ``(n_pixels, 3)``.
+   :type e: jax.Array
+   :param n: Surface normal vectors.  Shape ``(n_pixels, 3)``.
+   :type n: jax.Array
+   :param roughness: Macroscopic roughness angle in radians, :math:`\bar{\theta}`.
+                     Default is 0.0.
    :type roughness: float, optional
 
-   :returns: Calculated reflectance values, shape (...).
-   :rtype: npt.NDArray
+   :returns: Reflectance per pixel.  Shape ``(n_pixels,)``.  Pixels where the
+             source or detector is behind the local horizon are returned as NaN.
+   :rtype: jax.Array
 
-   :raises Exception: If any calculated reflectance value has a significant imaginary part.
+   .. rubric:: References
 
-   .. rubric:: Notes
+   .. bibliography::
+      :filter: False
 
-   - Input arrays `incidence_direction`, `emission_direction`,
-     `surface_orientation`, and `single_scattering_albedo` are expected to
-     broadcast together.
-   - The `phase_function` should be vectorized to handle arrays of `cos_alpha`.
-   - The IMSA model accounts for multiple scattering and absorption.
+      Hapke-2012
 
-   References
 
-   ----------
+.. py:class:: AmsaInversionState
 
-   [IMSAModelPlaceholder]
+   Reusable geometry-dependent state for AMSA albedo inversion.
+
+   Instances are created with :func:`prepare_amsa_inversion` and consumed by
+   :func:`invert_amsa_precomputed`. The state stores one or more precomputed
+   chunks so repeated inversions with fixed geometry can skip the expensive
+   geometry-only setup.
+
+
+   .. py:attribute:: chunks
+      :type:  tuple[tuple[int, int, dict], Ellipsis]
+
+
+   .. py:attribute:: n_pixels
+      :type:  int
+
+
+   .. py:attribute:: chunk_size
+      :type:  int
+
+
+.. py:function:: invert_amsa(refl_obs, b_n, i, e, n, roughness = 0.0, h_sh = 0.0, b0_sh = 0.0, h_cb = 0.0, b0_cb = 0.0, w0 = None, max_steps = 40, chunk_size = None)
+
+   Invert the AMSA model to recover single scattering albedo from
+   observed reflectance.
+
+   Solves the inverse problem for the Hapke AMSA forward model using a
+   chunked, batched Levenberg-Marquardt algorithm.  The single scattering
+   albedo :math:`w` is constrained to :math:`(0, 1)` via a
+   :math:`\tanh`-based variable transformation.  Convergence is tracked
+   per pixel through an active-set mask, and large datasets are
+   automatically split into memory-safe chunks.
+
+   :param refl_obs: Observed reflectance.  Shape ``(n_pixels,)``.
+   :type refl_obs: jax.Array
+   :param b_n: Legendre polynomial coefficients for the single-scattering phase
+               function.  Shape ``(n_coeffs,)``.
+   :type b_n: jax.Array
+   :param i: Incidence direction vectors.  Shape ``(n_pixels, 3)``.
+   :type i: jax.Array
+   :param e: Emission direction vectors.  Shape ``(n_pixels, 3)``.
+   :type e: jax.Array
+   :param n: Surface normal vectors.  Shape ``(n_pixels, 3)``.
+   :type n: jax.Array
+   :param roughness: Macroscopic roughness angle in radians, :math:`\bar{\theta}`.
+                     Default is 0.0.
+   :type roughness: float, optional
+   :param h_sh: SHOE angular width parameter.  Default is 0.0.
+   :type h_sh: float, optional
+   :param b0_sh: SHOE amplitude.  Default is 0.0.
+   :type b0_sh: float, optional
+   :param h_cb: CBOE angular width parameter.  Default is 0.0.
+   :type h_cb: float, optional
+   :param b0_cb: CBOE amplitude.  Default is 0.0.
+   :type b0_cb: float, optional
+   :param w0: Initial guess for the single scattering albedo.  Shape
+              ``(n_pixels,)``.  When ``None``, defaults to 1/3 everywhere.
+   :type w0: jax.Array or None, optional
+   :param max_steps: Maximum number of Levenberg-Marquardt iterations per chunk.
+                     Default is 40.
+   :type max_steps: int, optional
+   :param chunk_size: Number of pixels to process per chunk.  When ``None``, determined
+                      automatically by :func:`_adaptive_chunk_size`.
+   :type chunk_size: int or None, optional
+
+   :returns: Recovered single scattering albedo.  Shape ``(n_pixels,)``.
+   :rtype: jax.Array
+
+
+.. py:function:: invert_amsa_precomputed(refl_obs, state, w0 = None, max_steps = 40)
+
+   Invert AMSA reflectance using precomputed geometry state.
+
+   This is the high-throughput path for repeated inversions with fixed
+   geometry. For one-off calls, use :func:`invert_amsa`.
+
+   :param refl_obs: Observed reflectance. Shape ``(n_pixels,)``.
+   :type refl_obs: jax.Array
+   :param state: Prepared state from :func:`prepare_amsa_inversion`.
+   :type state: AmsaInversionState
+   :param w0: Initial guess for the single scattering albedo. Shape
+              ``(n_pixels,)``. When ``None``, defaults to 1/3 everywhere.
+   :type w0: jax.Array or None, optional
+   :param max_steps: Maximum number of Levenberg-Marquardt iterations per chunk.
+   :type max_steps: int, optional
+
+   :returns: Recovered single scattering albedo. Shape ``(n_pixels,)``.
+   :rtype: jax.Array
+
+
+.. py:function:: prepare_amsa_inversion(b_n, i, e, n, roughness = 0.0, h_sh = 0.0, b0_sh = 0.0, h_cb = 0.0, b0_cb = 0.0, chunk_size = None)
+
+   Prepare reusable geometry-dependent state for AMSA inversion.
+
+   Use this when the geometry and Hapke phase/opposition parameters stay
+   fixed while multiple observed reflectance arrays are inverted.
+
+   :param b_n: Legendre polynomial coefficients for the single-scattering phase
+               function. Shape ``(n_coeffs,)``.
+   :type b_n: jax.Array
+   :param i: Incidence direction vectors. Shape ``(n_pixels, 3)``.
+   :type i: jax.Array
+   :param e: Emission direction vectors. Shape ``(n_pixels, 3)``.
+   :type e: jax.Array
+   :param n: Surface normal vectors. Shape ``(n_pixels, 3)``.
+   :type n: jax.Array
+   :param roughness: AMSA geometry/opposition parameters matching :func:`invert_amsa`.
+   :type roughness: float, optional
+   :param h_sh: AMSA geometry/opposition parameters matching :func:`invert_amsa`.
+   :type h_sh: float, optional
+   :param b0_sh: AMSA geometry/opposition parameters matching :func:`invert_amsa`.
+   :type b0_sh: float, optional
+   :param h_cb: AMSA geometry/opposition parameters matching :func:`invert_amsa`.
+   :type h_cb: float, optional
+   :param b0_cb: AMSA geometry/opposition parameters matching :func:`invert_amsa`.
+   :type b0_cb: float, optional
+   :param chunk_size: Number of pixels to precompute per chunk. When ``None``, determined
+                      automatically from available memory.
+   :type chunk_size: int or None, optional
+
+   :returns: Reusable precomputed state for :func:`invert_amsa_precomputed`.
+   :rtype: AmsaInversionState
+
+
+.. py:function:: mimsa(w, b_n, i, e, n, roughness = 0.0, a_n = None)
+
+   Batched MIMSA reflectance.
+
+   Vectorised wrapper around :func:`_refl_mimsa_scalar` that evaluates the
+   modified isotropic multiple-scattering Hapke model for an arbitrary
+   number of pixels sharing the same Legendre coefficients and roughness.
+
+   :param w: Single scattering albedo per pixel.  Shape ``(n_pixels,)``.
+   :type w: jax.Array
+   :param b_n: Legendre polynomial coefficients.  Shape ``(n_coeffs,)``.
+   :type b_n: jax.Array
+   :param i: Incidence direction vectors.  Shape ``(n_pixels, 3)``.
+   :type i: jax.Array
+   :param e: Emission direction vectors.  Shape ``(n_pixels, 3)``.
+   :type e: jax.Array
+   :param n: Surface normal vectors.  Shape ``(n_pixels, 3)``.
+   :type n: jax.Array
+   :param roughness: Macroscopic roughness angle in radians, :math:`\bar{\theta}`.
+                     Default is 0.0.
+   :type roughness: float, optional
+   :param a_n: Legendre expansion coefficients for the multiple-scattering term.
+               When ``None`` (default), they are computed from the order of *b_n*
+               using :func:`~._core.coef_a`.
+   :type a_n: jax.Array or None, optional
+
+   :returns: Reflectance per pixel.  Shape ``(n_pixels,)``.  Pixels where the
+             source or detector is behind the local horizon are returned as NaN.
+   :rtype: jax.Array
+
+   .. rubric:: References
+
+   .. bibliography::
+      :filter: False
+
+      Hapke-2012
+      Hapke-2002
 
 
 .. py:class:: Hapke(/, **data)
@@ -203,33 +428,31 @@ Package Contents
 
 
    .. py:attribute:: single_scattering_albedo
-      :type:  numpy.typing.NDArray
-
-
-   .. py:attribute:: incidence_direction
-      :type:  numpy.typing.NDArray
-
-
-   .. py:attribute:: emission_direction
-      :type:  numpy.typing.NDArray
-
-
-   .. py:attribute:: surface_orientation
-      :type:  numpy.typing.NDArray
-
-
-   .. py:attribute:: phase_function
-      :type:  Callable[[numpy.typing.NDArray], numpy.typing.NDArray]
-
-
-   .. py:attribute:: opposition_effect_h
-      :type:  float
+      :type:  numpy.typing.NDArray | None
       :value: None
 
 
 
-   .. py:attribute:: oppoistion_effect_b0
-      :type:  float
+   .. py:attribute:: legendre_coefficients
+      :type:  numpy.typing.NDArray
+      :value: None
+
+
+
+   .. py:attribute:: incidence_direction
+      :type:  numpy.typing.NDArray
+      :value: None
+
+
+
+   .. py:attribute:: emission_direction
+      :type:  numpy.typing.NDArray
+      :value: None
+
+
+
+   .. py:attribute:: surface_orientation
+      :type:  numpy.typing.NDArray
       :value: None
 
 
@@ -240,8 +463,56 @@ Package Contents
 
 
 
+   .. py:attribute:: shadow_hiding_h
+      :type:  float
+      :value: None
+
+
+
+   .. py:attribute:: shadow_hiding_b0
+      :type:  float
+      :value: None
+
+
+
+   .. py:attribute:: coherent_backscattering_h
+      :type:  float
+      :value: None
+
+
+
+   .. py:attribute:: coherent_backscattering_b0
+      :type:  float
+      :value: None
+
+
+
+   .. py:attribute:: model
+      :type:  Literal['amsa', 'imsa', 'mimsa']
+      :value: None
+
+
+
    .. py:attribute:: model_config
 
       Configuration for the model, should be a dictionary conforming to [`ConfigDict`][pydantic.config.ConfigDict].
+
+
+   .. py:method:: model_post_init(__context)
+
+      Override this method to perform additional initialization after `__init__` and `model_construct`.
+      This is useful if you want to do some validation that requires the entire model to be initialized.
+
+
+
+   .. py:method:: _broadcast_to_shape(a, target_shape)
+      :staticmethod:
+
+
+
+   .. py:method:: refl()
+
+
+   .. py:method:: albedo(reflectance, x0 = None)
 
 

@@ -32,6 +32,7 @@ extensions = [
     "sphinx_copybutton",  # For adding a copy button to code blocks
     "sphinxcontrib.bibtex",  # For bibliography/citations
     "sphinxcontrib.autodoc_pydantic",
+    "sphinx.ext.intersphinx",  # Cross-references to Python/NumPy/pytest
 ]
 
 templates_path = ["_templates"]
@@ -43,7 +44,7 @@ source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
 # AutoAPI configuration
 # Specify the directories containing the Python code to document.
 # This should point to your source package(s).
-autoapi_dirs = ["../../refmod"]
+autoapi_dirs = ["../../src/refmod"]
 autoapi_type = "python"
 autoapi_add_toctree_entry = True  # Add generated API docs to the TOC
 autoapi_generate_api = True  # Generate individual pages for modules, classes, etc.
@@ -88,6 +89,10 @@ myst_enable_extensions = [
 bibtex_bibfiles = ["refs.bib"]
 bibtex_default_style = "unsrt"
 bibtex_reference_style = "author_year"
+suppress_warnings = [
+    "bibtex.duplicate_citation",
+    "bibtex.duplicate_label",
+]
 
 # Napoleon configuration (usually works fine with defaults)
 # napoleon_google_docstring = True
@@ -131,6 +136,12 @@ autodoc_options = {
     "show-inheritance": True,
 }
 inheritance_alias = {}
+
+nitpick_ignore = [
+    ("py:class", "optional"),
+    ("py:class", "jax._src.typing.ArrayLike"),
+    ("py:class", "npt.NDArray"),
+]
 
 # sphinx-copybutton configuration
 # copybutton_prompt_text = "$ " # Add a prompt pattern to remove from copied text
@@ -183,6 +194,7 @@ pygments_style = "sphinx"  # Or 'friendly', 'colorful', 'monokai', etc.
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
+    "jax": ("https://docs.jax.dev/en/latest/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "pytest": ("https://docs.pytest.org/en/stable/", None),
-    # Add others like scipy, pandas if you use/reference them
 }
