@@ -1,0 +1,114 @@
+{
+  "strSchema": "refmod-fixture-manifest/1",
+  "strGenerator": "ReflectanceModels/fixtures/generate_all.m",
+  "cases": [
+    {
+      "name": "geometry_sweep_amsa",
+      "model": "hapke_amsa",
+      "file": "geometry_sweep_amsa.mat",
+      "matlab_release": "2025a",
+      "git_sha": "db84876",
+      "rtol": 1E-8,
+      "atol": 1E-13
+    },
+    {
+      "name": "roughness_sweep_tb00",
+      "model": "hapke_amsa",
+      "file": "roughness_sweep_tb00.mat",
+      "matlab_release": "2025a",
+      "git_sha": "db84876",
+      "rtol": 1E-8,
+      "atol": 1E-13
+    },
+    {
+      "name": "roughness_sweep_tb05",
+      "model": "hapke_amsa",
+      "file": "roughness_sweep_tb05.mat",
+      "matlab_release": "2025a",
+      "git_sha": "db84876",
+      "rtol": 1E-8,
+      "atol": 1E-13
+    },
+    {
+      "name": "roughness_sweep_tb10",
+      "model": "hapke_amsa",
+      "file": "roughness_sweep_tb10.mat",
+      "matlab_release": "2025a",
+      "git_sha": "db84876",
+      "rtol": 1E-8,
+      "atol": 1E-13
+    },
+    {
+      "name": "roughness_sweep_tb20",
+      "model": "hapke_amsa",
+      "file": "roughness_sweep_tb20.mat",
+      "matlab_release": "2025a",
+      "git_sha": "db84876",
+      "rtol": 1E-8,
+      "atol": 1E-13
+    },
+    {
+      "name": "roughness_sweep_tb30",
+      "model": "hapke_amsa",
+      "file": "roughness_sweep_tb30.mat",
+      "matlab_release": "2025a",
+      "git_sha": "db84876",
+      "rtol": 1E-8,
+      "atol": 1E-13
+    },
+    {
+      "name": "amsa_dhg",
+      "model": "hapke_amsa",
+      "file": "amsa_dhg.mat",
+      "matlab_release": "2025a",
+      "git_sha": "db84876",
+      "rtol": 1E-8,
+      "atol": 1E-13
+    },
+    {
+      "name": "amsa_dhg_nocboe",
+      "model": "hapke_amsa",
+      "file": "amsa_dhg_nocboe.mat",
+      "matlab_release": "2025a",
+      "git_sha": "db84876",
+      "rtol": 1E-8,
+      "atol": 1E-13
+    },
+    {
+      "name": "imsa_approx_h",
+      "model": "hapke_imsa",
+      "file": "imsa_approx_h.mat",
+      "matlab_release": "2025a",
+      "git_sha": "db84876",
+      "rtol": 1E-8,
+      "atol": 1E-13
+    },
+    {
+      "name": "imsa_exact_h",
+      "model": "hapke_imsa_modifiedH",
+      "file": "imsa_exact_h.mat",
+      "matlab_release": "2025a",
+      "git_sha": "db84876",
+      "rtol": 1E-8,
+      "atol": 1E-13
+    },
+    {
+      "name": "lunar_lambert",
+      "model": "lunar_lambert_model",
+      "file": "lunar_lambert.mat",
+      "matlab_release": "2025a",
+      "git_sha": "db84876",
+      "rtol": 1E-8,
+      "atol": 1E-13
+    },
+    {
+      "name": "legendre_reference",
+      "model": "hapke_amsa_int_legendre",
+      "file": "legendre_reference.mat",
+      "matlab_release": "2025a",
+      "git_sha": "db84876",
+      "rtol": 1E-8,
+      "atol": 1E-13
+    }
+  ]
+}
