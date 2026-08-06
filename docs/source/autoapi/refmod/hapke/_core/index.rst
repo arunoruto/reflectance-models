@@ -6,8 +6,16 @@ refmod.hapke._core
 
 
 
+
+
 Module Contents
 ---------------
+
+.. py:data:: DHG_TRUNCATION_WARN_THRESHOLD
+   :value: 0.0001
+
+
+   Truncation-error bound above which :func:`dhg_legendre_coefficients` warns.
 
 .. py:function:: normalize(v)
 
@@ -39,8 +47,8 @@ Module Contents
 
    Hapke isotropic multiple-scattering H-function.
 
-   Computes the Ambartsumian–Chandrasekhar H-function using the
-   Cornette & Shanks level 2 approximation:
+   Computes the Ambartsumian–Chandrasekhar H-function using Hapke's
+   level-2 approximation (Hapke 2002, Eq. 13):
 
    .. math::
 
@@ -60,15 +68,19 @@ Module Contents
 
    .. rubric:: References
 
-   :cite:p:`Cornette-1992`
+   :cite:p:`Hapke-2002`
 
 
 .. py:function:: h_function_derivative(x, w)
 
    Derivative of the H-function with respect to single-scattering albedo.
 
-   Computes :math:`\partial H(x, w) / \partial w` using the Cornette &
-   Shanks level 2 approximation.
+   Computes :math:`\partial H(x, w) / \partial w` of Hapke's level-2
+   approximation (see :func:`h_function`).
+
+   Note: kept alongside JAX autodiff on purpose — it matches the MATLAB
+   ``hapke_amsa.m`` derivative exactly and is marginally faster than
+   ``jax.jvp`` of the forward model.
 
    :param x: Direction cosine :math:`\mu` or :math:`\mu_0`.
    :type x: jax.Array
@@ -80,7 +92,7 @@ Module Contents
 
    .. rubric:: References
 
-   :cite:p:`Cornette-1992`
+   :cite:p:`Hapke-2002`
 
 
 .. py:function:: coef_a(n = 15)
@@ -109,6 +121,51 @@ Module Contents
    :cite:p:`Hapke-2002`
 
 
+.. py:function:: dhg_truncation_error(b, c, n)
+
+   Upper bound on the truncation error of the DHG Legendre expansion.
+
+   The DHG phase function has the exact expansion
+   :math:`p(x) = \sum_k b_k P_k(x)` with
+   :math:`|b_k| \leq \max(1, |c|)\,(2k+1)\,|b|^k` and :math:`|P_k(x)| \leq 1`,
+   so the absolute error of truncating after order *n* is bounded by the
+   tail sum
+
+   .. math::
+
+       \epsilon_n \leq \max(1, |c|) \sum_{k=n+1}^{\infty} (2k+1)\,|b|^k .
+
+   :param b: Asymmetry parameter (:math:`|b| < 1`).
+   :type b: float
+   :param c: Backscatter fraction.
+   :type c: float
+   :param n: Truncation order.
+   :type n: int
+
+   :returns: Upper bound on the max absolute error of the reconstructed phase
+             function. ``inf`` if :math:`|b| \geq 1`.
+   :rtype: float
+
+
+.. py:function:: recommended_dhg_order(b, c, tol = DHG_TRUNCATION_WARN_THRESHOLD, max_order = 300)
+
+   Smallest Legendre order whose truncation-error bound is below *tol*.
+
+   See :func:`dhg_truncation_error` for the bound.
+
+   :param b: Asymmetry parameter.
+   :type b: float
+   :param c: Backscatter fraction.
+   :type c: float
+   :param tol: Target error bound.
+   :type tol: float, optional
+   :param max_order: Upper limit for the search (returned if no order satisfies *tol*).
+   :type max_order: int, optional
+
+   :returns: Recommended number of Legendre orders.
+   :rtype: int
+
+
 .. py:function:: dhg_legendre_coefficients(b, c, n = 15)
 
    Legendre expansion coefficients for the Double Henyey–Greenstein phase function.
@@ -132,6 +189,14 @@ Module Contents
    :returns: Array of Legendre coefficients :math:`b_n` of length *n+1*.
    :rtype: jax.Array
 
+   .. rubric:: Notes
+
+   When *b* and *c* are plain scalars, the truncation error of the series
+   is checked against ``DHG_TRUNCATION_WARN_THRESHOLD`` and a warning with
+   a recommended order is emitted if the reconstruction of the phase
+   function would be too inaccurate (relevant for strongly peaked phase
+   functions, roughly :math:`|b| \gtrsim 0.4` at the default order).
+
    .. rubric:: References
 
    :cite:p:`Henyey-1941`
@@ -140,6 +205,14 @@ Module Contents
 .. py:function:: cs_legendre_coefficients(xi, n = 15)
 
    Legendre expansion coefficients for the Cornette–Shanks phase function.
+
+   .. deprecated:: 1.1
+       Unvalidated and likely misaligned: the returned coefficients start
+       at order 1 (not 0), so they are shifted by one order relative to
+       what :func:`legendre_eval` and :func:`function_p` expect. Use
+       :func:`refmod.hapke.cornette.cornette_legendre_coefficients` (the
+       MATLAB-derived variant) if Cornette support is needed. Kept for
+       reference until the Cornette models are validated.
 
    :param xi: Asymmetry parameter :math:`\xi`.
    :type xi: float
@@ -204,9 +277,10 @@ Module Contents
 
 .. py:function:: legendre_eval(x, b_n)
 
-   Evaluate a Legendre polynomial series using Clenshaw recurrence.
+   Evaluate a Legendre polynomial series via the Bonnet recurrence.
 
-   Computes :math:`\sum_{n=0}^{N} b_n P_n(x)`.
+   Computes :math:`\sum_{n=0}^{N} b_n P_n(x)` using the three-term
+   recurrence :math:`n P_n = (2n-1) x P_{n-1} - (n-1) P_{n-2}`.
 
    :param x: Argument :math:`x` where :math:`|x| \leq 1`.
    :type x: jax.Array

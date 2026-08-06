@@ -10,13 +10,17 @@ Submodules
 .. toctree::
    :maxdepth: 1
 
+   /autoapi/refmod/api/index
    /autoapi/refmod/config/index
    /autoapi/refmod/dtm_helper/index
    /autoapi/refmod/hapke/index
+   /autoapi/refmod/jax/index
    /autoapi/refmod/lambert/index
+   /autoapi/refmod/lunar_lambert/index
    /autoapi/refmod/mixing/index
    /autoapi/refmod/shkuratov/index
    /autoapi/refmod/utils/index
+   /autoapi/refmod/warmup/index
 
 
 
@@ -225,6 +229,16 @@ Package Contents
 
    :returns: Reflectance per pixel.  Shape ``(n_pixels,)``.
    :rtype: jax.Array
+
+
+.. py:function:: lunar_lambert(rho, th_i, th_e, alpha)
+
+   MATLAB-compatible lunar-Lambert reflectance model.
+
+   This ports the reference ``lunar_lambert_model.m``. It is a lookup-table
+   model, tabulated for :math:`\bar{\theta} = 10^\circ` and :math:`w = 0.1`,
+   and is intentionally separate from physical Lambertian reflectance
+   (:func:`~refmod.lambert.lambert`).
 
 
 .. py:function:: shkuratov(a_n, mu1 = 0.0, eta = 0.0, i = None, e = None, n = None, m0 = 0.0, mu2 = 0.0)

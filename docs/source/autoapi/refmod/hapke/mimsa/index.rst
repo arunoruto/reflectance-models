@@ -60,6 +60,12 @@ Module Contents
    modified isotropic multiple-scattering Hapke model for an arbitrary
    number of pixels sharing the same Legendre coefficients and roughness.
 
+   .. note::
+       MIMSA is mathematically identical to :func:`refmod.hapke.amsa` with
+       all opposition-effect parameters left at zero (asserted by
+       ``test_mimsa_equals_amsa_no_opposition``). Prefer :func:`amsa` in
+       new code; this wrapper is kept for API stability.
+
    :param w: Single scattering albedo per pixel.  Shape ``(n_pixels,)``.
    :type w: jax.Array
    :param b_n: Legendre polynomial coefficients.  Shape ``(n_coeffs,)``.

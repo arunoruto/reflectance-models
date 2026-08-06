@@ -12,7 +12,9 @@ Submodules
 
    /autoapi/refmod/hapke/_core/index
    /autoapi/refmod/hapke/amsa/index
+   /autoapi/refmod/hapke/cornette/index
    /autoapi/refmod/hapke/imsa/index
+   /autoapi/refmod/hapke/imsa_modified/index
    /autoapi/refmod/hapke/inverse/index
    /autoapi/refmod/hapke/mimsa/index
 
@@ -54,6 +56,14 @@ Package Contents
 
    Legendre expansion coefficients for the Cornette–Shanks phase function.
 
+   .. deprecated:: 1.1
+       Unvalidated and likely misaligned: the returned coefficients start
+       at order 1 (not 0), so they are shifted by one order relative to
+       what :func:`legendre_eval` and :func:`function_p` expect. Use
+       :func:`refmod.hapke.cornette.cornette_legendre_coefficients` (the
+       MATLAB-derived variant) if Cornette support is needed. Kept for
+       reference until the Cornette models are validated.
+
    :param xi: Asymmetry parameter :math:`\xi`.
    :type xi: float
    :param n: Number of coefficients to compute (default 15). Returns *n+1* values.
@@ -90,9 +100,62 @@ Package Contents
    :returns: Array of Legendre coefficients :math:`b_n` of length *n+1*.
    :rtype: jax.Array
 
+   .. rubric:: Notes
+
+   When *b* and *c* are plain scalars, the truncation error of the series
+   is checked against ``DHG_TRUNCATION_WARN_THRESHOLD`` and a warning with
+   a recommended order is emitted if the reconstruction of the phase
+   function would be too inaccurate (relevant for strongly peaked phase
+   functions, roughly :math:`|b| \gtrsim 0.4` at the default order).
+
    .. rubric:: References
 
    :cite:p:`Henyey-1941`
+
+
+.. py:function:: dhg_truncation_error(b, c, n)
+
+   Upper bound on the truncation error of the DHG Legendre expansion.
+
+   The DHG phase function has the exact expansion
+   :math:`p(x) = \sum_k b_k P_k(x)` with
+   :math:`|b_k| \leq \max(1, |c|)\,(2k+1)\,|b|^k` and :math:`|P_k(x)| \leq 1`,
+   so the absolute error of truncating after order *n* is bounded by the
+   tail sum
+
+   .. math::
+
+       \epsilon_n \leq \max(1, |c|) \sum_{k=n+1}^{\infty} (2k+1)\,|b|^k .
+
+   :param b: Asymmetry parameter (:math:`|b| < 1`).
+   :type b: float
+   :param c: Backscatter fraction.
+   :type c: float
+   :param n: Truncation order.
+   :type n: int
+
+   :returns: Upper bound on the max absolute error of the reconstructed phase
+             function. ``inf`` if :math:`|b| \geq 1`.
+   :rtype: float
+
+
+.. py:function:: recommended_dhg_order(b, c, tol = DHG_TRUNCATION_WARN_THRESHOLD, max_order = 300)
+
+   Smallest Legendre order whose truncation-error bound is below *tol*.
+
+   See :func:`dhg_truncation_error` for the bound.
+
+   :param b: Asymmetry parameter.
+   :type b: float
+   :param c: Backscatter fraction.
+   :type c: float
+   :param tol: Target error bound.
+   :type tol: float, optional
+   :param max_order: Upper limit for the search (returned if no order satisfies *tol*).
+   :type max_order: int, optional
+
+   :returns: Recommended number of Legendre orders.
+   :rtype: int
 
 
 .. py:function:: amsa(w, b_n, i, e, n, roughness = 0.0, h_sh = 0.0, b0_sh = 0.0, h_cb = 0.0, b0_cb = 0.0, a_n = None)
@@ -137,6 +200,19 @@ Package Contents
    :cite:p:`Hapke-2012`
 
 
+.. py:function:: amsa_cornette(w, xi, i, e, n, roughness = 0.0, h_sh = 0.0, b0_sh = 0.0, h_cb = 0.0, b0_cb = 0.0, n_order = 11)
+
+.. py:function:: cornette_legendre_coefficients(xi, n = 11)
+
+   Cornette-Shanks Legendre expansion coefficients.
+
+   Implemented from the reference ``hapke_amsa_cornette.m``. These have not
+   yet been fixture-validated against the reference output; prefer the
+   Double Henyey-Greenstein models for validated results.
+
+
+.. py:function:: imsa_cornette(w, xi, i, e, n, roughness = 0.0, h_sh = 0.0, b0_sh = 0.0)
+
 .. py:function:: imsa(w, b_n, i, e, n, roughness = 0.0)
 
    Batched IMSA reflectance.
@@ -169,6 +245,20 @@ Package Contents
       :filter: False
 
       Hapke-2012
+
+
+.. py:function:: imsa_modified_h(w, b, c, i, e, n, roughness = 0.0, h_sh = 0.0, b0_sh = 0.0)
+
+   Batched IMSA reflectance using Hapke's modified H-function.
+
+   Combines a Double Henyey-Greenstein phase function, the shadow-hiding
+   opposition effect, the macroscopic roughness correction, and Hapke's
+   modified H-function approximation
+   :math:`H(x) \approx (1 + 2x) / (1 + 2x\gamma)`.
+
+   Matches the reference implementation ``hapke_imsa_modifiedH.m``. Note
+   that the reference ``hapke_imsa.m`` implements this same model rather
+   than the isotropic :func:`~refmod.hapke.imsa` in this package.
 
 
 .. py:class:: AmsaInversionState
@@ -303,6 +393,12 @@ Package Contents
    Vectorised wrapper around :func:`_refl_mimsa_scalar` that evaluates the
    modified isotropic multiple-scattering Hapke model for an arbitrary
    number of pixels sharing the same Legendre coefficients and roughness.
+
+   .. note::
+       MIMSA is mathematically identical to :func:`refmod.hapke.amsa` with
+       all opposition-effect parameters left at zero (asserted by
+       ``test_mimsa_equals_amsa_no_opposition``). Prefer :func:`amsa` in
+       new code; this wrapper is kept for API stability.
 
    :param w: Single scattering albedo per pixel.  Shape ``(n_pixels,)``.
    :type w: jax.Array
