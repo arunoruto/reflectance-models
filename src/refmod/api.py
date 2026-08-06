@@ -14,6 +14,24 @@ them for the common application case:
   respect to the surface normal and to the surface gradients ``(p, q)``.
 - :func:`invert_albedo_multi` retrieves one albedo per pixel from one or
   more observations of the same scene.
+
+Every function above returns NumPy and is meant to be called a handful of
+times. Iterative callers -- shape-from-shading in particular, which evaluates
+a model and its gradients once per iteration for hundreds of iterations --
+need the opposite: results that stay on the device so the whole loop can live
+inside a single :func:`jax.jit`. That is what the ``*_jax`` family provides:
+
+- :func:`reflectance_jax` is :func:`reflectance_image` without the NumPy
+  round-trip.
+- :func:`reflectance_pq_jax` parametrises the surface by its gradients
+  ``(p, q)`` instead of by the normal.
+- :func:`reflectance_pq_and_grad_jax` returns reflectance together with
+  ``dR/dp`` and ``dR/dq`` at the same point, which is the inner-loop
+  primitive for shape-from-shading.
+
+These are ordinary JAX functions: traceable, jittable, differentiable, and
+usable under ``vmap``. They return ``jax.Array``; wrap a call in
+``np.asarray`` if you want NumPy back.
 """
 
 from __future__ import annotations
@@ -27,7 +45,14 @@ import numpy as np
 import numpy.typing as npt
 from scipy.ndimage import gaussian_filter
 
-from refmod.hapke import amsa, amsa_cornette, dhg_legendre_coefficients, imsa, imsa_cornette, imsa_modified_h
+from refmod.hapke import (
+    amsa,
+    amsa_cornette,
+    dhg_legendre_coefficients,
+    imsa,
+    imsa_cornette,
+    imsa_modified_h,
+)
 from refmod.lunar_lambert import lunar_lambert
 
 InvalidMode = Literal["nan", "zero", "mask"]
@@ -212,7 +237,12 @@ def reflectance_image(
     s: npt.ArrayLike,
     v: npt.ArrayLike,
     n: npt.ArrayLike,
-    params: HapkeAmsaParams | HapkeImsaParams | HapkeCornetteParams | LunarLambertParams | dict[str, Any] | None = None,
+    params: HapkeAmsaParams
+    | HapkeImsaParams
+    | HapkeCornetteParams
+    | LunarLambertParams
+    | dict[str, Any]
+    | None = None,
     invalid: InvalidMode = "nan",
 ) -> npt.NDArray | tuple[npt.NDArray, npt.NDArray[np.bool_]]:
     r"""Evaluate a reflectance model and preserve image-shaped inputs.
@@ -246,7 +276,12 @@ def reflectance_normal_jacobian(
     s: npt.ArrayLike,
     v: npt.ArrayLike,
     n: npt.ArrayLike,
-    params: HapkeAmsaParams | HapkeImsaParams | HapkeCornetteParams | LunarLambertParams | dict[str, Any] | None = None,
+    params: HapkeAmsaParams
+    | HapkeImsaParams
+    | HapkeCornetteParams
+    | LunarLambertParams
+    | dict[str, Any]
+    | None = None,
     invalid: InvalidMode = "zero",
 ) -> npt.NDArray | tuple[npt.NDArray, npt.NDArray[np.bool_]]:
     r"""Return per-pixel reflectance derivatives with respect to normal vectors."""
@@ -267,7 +302,10 @@ def reflectance_normal_jacobian(
         return _reflectance_one_jax(model, w_value, s_value, v_value, n_value, prepared)
 
     jac = jax.vmap(jax.jacfwd(one, argnums=3))(
-        jnp.asarray(w_flat), jnp.asarray(s_flat), jnp.asarray(v_flat), jnp.asarray(n_flat)
+        jnp.asarray(w_flat),
+        jnp.asarray(s_flat),
+        jnp.asarray(v_flat),
+        jnp.asarray(n_flat),
     )
     return _format_invalid(jac, valid[:, None], out_shape + (3,), invalid)
 
@@ -279,7 +317,12 @@ def reflectance_gradient_jacobian(
     v: npt.ArrayLike,
     p: npt.ArrayLike,
     q: npt.ArrayLike,
-    params: HapkeAmsaParams | HapkeImsaParams | HapkeCornetteParams | LunarLambertParams | dict[str, Any] | None = None,
+    params: HapkeAmsaParams
+    | HapkeImsaParams
+    | HapkeCornetteParams
+    | LunarLambertParams
+    | dict[str, Any]
+    | None = None,
     invalid: InvalidMode = "zero",
 ) -> npt.NDArray | tuple[npt.NDArray, npt.NDArray[np.bool_]]:
     r"""Return derivatives with respect to surface gradients ``p`` and ``q``.
@@ -289,7 +332,9 @@ def reflectance_gradient_jacobian(
     """
     p_arr = np.asarray(p, dtype=float)
     q_arr = np.asarray(q, dtype=float)
-    out_shape = np.broadcast_shapes(np.asarray(w).shape if np.asarray(w).size != 1 else (), p_arr.shape, q_arr.shape)
+    out_shape = np.broadcast_shapes(
+        np.asarray(w).shape if np.asarray(w).size != 1 else (), p_arr.shape, q_arr.shape
+    )
     n_pixels = int(np.prod(out_shape)) if out_shape else 1
     p_flat = _field_to_flat(np.broadcast_to(p_arr, out_shape), out_shape, n_pixels, "p")
     q_flat = _field_to_flat(np.broadcast_to(q_arr, out_shape), out_shape, n_pixels, "q")
@@ -315,13 +360,200 @@ def reflectance_gradient_jacobian(
     return _format_invalid(jac, valid[:, None], out_shape + (2,), invalid)
 
 
+def reflectance_jax(
+    model: ModelName,
+    w: jax.Array,
+    s: jax.Array,
+    v: jax.Array,
+    n: jax.Array,
+    params: HapkeAmsaParams
+    | HapkeImsaParams
+    | HapkeCornetteParams
+    | LunarLambertParams
+    | dict[str, Any]
+    | None = None,
+) -> jax.Array:
+    r"""Evaluate a reflectance model without leaving the device.
+
+    The device-resident counterpart of :func:`reflectance_image`. Traceable,
+    jittable and differentiable, so an iterative caller can keep an entire
+    solver loop inside one :func:`jax.jit` instead of paying a host round-trip
+    per evaluation.
+
+    Unlike :func:`reflectance_image` this does not accept ``(3, ...)`` geometry
+    and does not offer ``invalid=`` handling: geometry must be ``(..., 3)``,
+    and invalid geometry yields NaN, which callers mask themselves. Both
+    restrictions keep the traced graph free of host-side branching.
+
+    Parameters
+    ----------
+    model : ModelName
+        Reflectance model to evaluate.
+    w : jax.Array
+        Single-scattering albedo, broadcast to the batch shape.
+    s, v, n : jax.Array
+        Incidence, emission and surface-normal vectors, shape ``(..., 3)``.
+        ``s`` and ``v`` broadcast against the batch shape of ``n``.
+    params : HapkeAmsaParams or HapkeImsaParams or HapkeCornetteParams or LunarLambertParams or dict, optional
+        Model parameters. The frozen parameter dataclasses are hashable and so
+        may be passed as ``static_argnums`` of an enclosing ``jit``.
+
+    Returns
+    -------
+    jax.Array
+        Reflectance with the batch shape of ``n``, i.e. ``n.shape[:-1]``.
+
+    See Also
+    --------
+    reflectance_image : NumPy-returning equivalent with invalid-geometry modes.
+    reflectance_pq_and_grad_jax : Fused value and surface-gradient derivatives.
+    """
+    resolved = _normalize_model(model)
+    prepared = _prepare_params(resolved, params)
+    n_j = jnp.asarray(n)
+    batch = n_j.shape[:-1]
+    refl = _reflectance_flat_jax(
+        resolved,
+        jnp.reshape(jnp.broadcast_to(jnp.asarray(w), batch), (-1,)),
+        jnp.reshape(jnp.broadcast_to(jnp.asarray(s), (*batch, 3)), (-1, 3)),
+        jnp.reshape(jnp.broadcast_to(jnp.asarray(v), (*batch, 3)), (-1, 3)),
+        jnp.reshape(n_j, (-1, 3)),
+        prepared,
+    )
+    return jnp.reshape(refl, batch)
+
+
+def _normals_from_pq(p: jax.Array, q: jax.Array) -> jax.Array:
+    r"""Surface normals from gradients, ``n = normalize([-p, -q, 1])``."""
+    norm = jnp.sqrt(1.0 + p**2 + q**2)
+    return jnp.stack((-p / norm, -q / norm, jnp.ones_like(p) / norm), axis=-1)
+
+
+def reflectance_pq_jax(
+    model: ModelName,
+    w: jax.Array,
+    s: jax.Array,
+    v: jax.Array,
+    p: jax.Array,
+    q: jax.Array,
+    params: HapkeAmsaParams
+    | HapkeImsaParams
+    | HapkeCornetteParams
+    | LunarLambertParams
+    | dict[str, Any]
+    | None = None,
+) -> jax.Array:
+    r"""Evaluate a reflectance model as a function of surface gradients.
+
+    As :func:`reflectance_jax`, but the surface is given by its gradients
+    under the shape-from-shading parametrisation ``n = normalize([-p, -q, 1])``
+    rather than by an explicit normal.
+
+    Parameters
+    ----------
+    model : ModelName
+        Reflectance model to evaluate.
+    w : jax.Array
+        Single-scattering albedo, broadcast to the batch shape.
+    s, v : jax.Array
+        Incidence and emission vectors, shape ``(..., 3)``.
+    p, q : jax.Array
+        Surface gradients, broadcast against each other to give the batch shape.
+    params : HapkeAmsaParams or HapkeImsaParams or HapkeCornetteParams or LunarLambertParams or dict, optional
+        Model parameters.
+
+    Returns
+    -------
+    jax.Array
+        Reflectance with the broadcast batch shape of ``p`` and ``q``.
+    """
+    p_j, q_j = jnp.broadcast_arrays(jnp.asarray(p), jnp.asarray(q))
+    return reflectance_jax(model, w, s, v, _normals_from_pq(p_j, q_j), params)
+
+
+def reflectance_pq_and_grad_jax(
+    model: ModelName,
+    w: jax.Array,
+    s: jax.Array,
+    v: jax.Array,
+    p: jax.Array,
+    q: jax.Array,
+    params: HapkeAmsaParams
+    | HapkeImsaParams
+    | HapkeCornetteParams
+    | LunarLambertParams
+    | dict[str, Any]
+    | None = None,
+) -> tuple[jax.Array, jax.Array, jax.Array]:
+    r"""Reflectance and its surface-gradient derivatives at the same point.
+
+    Returns ``R``, ``dR/dp`` and ``dR/dq`` under the shape-from-shading
+    parametrisation ``n = normalize([-p, -q, 1])``. This is the inner-loop
+    primitive of a shape-from-shading iteration, which needs the model value
+    and both partials evaluated at one surface estimate.
+
+    The derivatives come from forward-mode autodiff, and are exact. The MATLAB
+    reference this package was ported from used central differences with a
+    fixed step of ``1e-6``, costing four extra model evaluations per image per
+    iteration; two ``jvp`` passes are both cheaper and free of truncation
+    error.
+
+    Because reflectance is elementwise in ``(p, q)``, a tangent of ones
+    recovers the per-pixel partial directly -- no Jacobian is ever
+    materialised, and this stays O(1) in memory per pixel rather than the
+    O(n_pixels) a naive ``jacfwd`` over the whole field would need.
+
+    Parameters
+    ----------
+    model : ModelName
+        Reflectance model to evaluate.
+    w : jax.Array
+        Single-scattering albedo, broadcast to the batch shape.
+    s, v : jax.Array
+        Incidence and emission vectors, shape ``(..., 3)``.
+    p, q : jax.Array
+        Surface gradients, broadcast against each other to give the batch shape.
+    params : HapkeAmsaParams or HapkeImsaParams or HapkeCornetteParams or LunarLambertParams or dict, optional
+        Model parameters.
+
+    Returns
+    -------
+    tuple[jax.Array, jax.Array, jax.Array]
+        ``(reflectance, dR/dp, dR/dq)``, each with the broadcast batch shape
+        of ``p`` and ``q``.
+
+    See Also
+    --------
+    reflectance_gradient_jacobian : NumPy-returning equivalent, value excluded.
+    """
+    p_j, q_j = jnp.broadcast_arrays(jnp.asarray(p), jnp.asarray(q))
+    ones = jnp.ones_like(p_j)
+
+    refl, d_dp = jax.jvp(
+        lambda arg: reflectance_pq_jax(model, w, s, v, arg, q_j, params),
+        (p_j,),
+        (ones,),
+    )
+    _, d_dq = jax.jvp(
+        lambda arg: reflectance_pq_jax(model, w, s, v, p_j, arg, params),
+        (q_j,),
+        (ones,),
+    )
+    return refl, d_dp, d_dq
+
+
 def _reflectance_flat_jax(
     model: str,
     w_flat: np.ndarray | jax.Array,
     s_flat: np.ndarray | jax.Array,
     v_flat: np.ndarray | jax.Array,
     n_flat: np.ndarray | jax.Array,
-    params: HapkeAmsaParams | HapkeImsaParams | HapkeCornetteParams | LunarLambertParams | dict[str, Any] | None,
+    params: HapkeAmsaParams
+    | HapkeImsaParams
+    | HapkeCornetteParams
+    | LunarLambertParams
+    | dict[str, Any]
+    | None,
 ) -> jax.Array:
     params = _prepare_params(model, params)
     w_j = jnp.asarray(w_flat)
@@ -358,17 +590,29 @@ def _reflectance_flat_jax(
         )
     elif model == "imsa-modified-h":
         if params is None:
-            raise ValueError("IMSA modified-H requires HapkeImsaParams or a config dict")
-        return imsa_modified_h(w_j, params.b, params.c, s_j, v_j, n_j, params.tb, params.h, params.b0)
+            raise ValueError(
+                "IMSA modified-H requires HapkeImsaParams or a config dict"
+            )
+        return imsa_modified_h(
+            w_j, params.b, params.c, s_j, v_j, n_j, params.tb, params.h, params.b0
+        )
     elif model == "amsa-cornette":
         if params is None:
-            raise ValueError("AMSA Cornette requires HapkeCornetteParams or a config dict")
+            raise ValueError(
+                "AMSA Cornette requires HapkeCornetteParams or a config dict"
+            )
         h_cb, b0_cb = params.coherent_backscatter
-        return amsa_cornette(w_j, params.xi, s_j, v_j, n_j, params.tb, params.hs, params.Bs0, h_cb, b0_cb)
+        return amsa_cornette(
+            w_j, params.xi, s_j, v_j, n_j, params.tb, params.hs, params.Bs0, h_cb, b0_cb
+        )
     elif model == "imsa-cornette":
         if params is None:
-            raise ValueError("IMSA Cornette requires HapkeCornetteParams or a config dict")
-        return imsa_cornette(w_j, params.xi, s_j, v_j, n_j, params.tb, params.hs, params.Bs0)
+            raise ValueError(
+                "IMSA Cornette requires HapkeCornetteParams or a config dict"
+            )
+        return imsa_cornette(
+            w_j, params.xi, s_j, v_j, n_j, params.tb, params.hs, params.Bs0
+        )
     else:
         th_i, th_e, alpha = _geometry_angles_jax(s_j, v_j, n_j)
         return lunar_lambert(w_j, th_i, th_e, alpha)
@@ -380,7 +624,10 @@ def _reflectance_one_jax(
     s_value: jax.Array,
     v_value: jax.Array,
     n_value: jax.Array,
-    params: HapkeAmsaParams | HapkeImsaParams | HapkeCornetteParams | LunarLambertParams,
+    params: HapkeAmsaParams
+    | HapkeImsaParams
+    | HapkeCornetteParams
+    | LunarLambertParams,
 ) -> jax.Array:
     return _reflectance_flat_jax(
         model,
@@ -394,7 +641,12 @@ def _reflectance_one_jax(
 
 def _prepare_params(
     model: str,
-    params: HapkeAmsaParams | HapkeImsaParams | HapkeCornetteParams | LunarLambertParams | dict[str, Any] | None,
+    params: HapkeAmsaParams
+    | HapkeImsaParams
+    | HapkeCornetteParams
+    | LunarLambertParams
+    | dict[str, Any]
+    | None,
 ) -> HapkeAmsaParams | HapkeImsaParams | HapkeCornetteParams | LunarLambertParams:
     if model == "amsa":
         if isinstance(params, dict):
@@ -426,7 +678,11 @@ def invert_albedo_multi(
     s: npt.ArrayLike,
     v: npt.ArrayLike,
     n: npt.ArrayLike,
-    params: HapkeAmsaParams | HapkeImsaParams | LunarLambertParams | dict[str, Any] | None,
+    params: HapkeAmsaParams
+    | HapkeImsaParams
+    | LunarLambertParams
+    | dict[str, Any]
+    | None,
     initial_w: npt.ArrayLike | float = 1.0 / 3.0,
     mask: npt.ArrayLike | None = None,
     model: Literal[
@@ -451,12 +707,16 @@ def invert_albedo_multi(
     """
     model = _normalize_model(model)
     if model not in ("amsa", "imsa-modified-h", "lunar-lambert"):
-        raise NotImplementedError("invert_albedo_multi supports 'amsa', 'imsa_modified_h', and 'lunar-lambert'")
+        raise NotImplementedError(
+            "invert_albedo_multi supports 'amsa', 'imsa_modified_h', and 'lunar-lambert'"
+        )
     params = _prepare_params(model, params)
 
     reflectance_arr = np.asarray(reflectance, dtype=float)
     if reflectance_arr.ndim < 2:
-        raise ValueError(f"reflectance must have shape (n_images, ...), got {reflectance_arr.shape}")
+        raise ValueError(
+            f"reflectance must have shape (n_images, ...), got {reflectance_arr.shape}"
+        )
     out_shape = reflectance_arr.shape[1:]
     active_stack = _active_mask_stack(reflectance_arr, mask)
     if sigma > 0:
@@ -481,7 +741,9 @@ def invert_albedo_multi(
         active[k] &= _valid_geometry(s_flat[k], v_flat[k], n_flat)
 
     if model == "lunar-lambert":
-        return _invert_lunar_lambert_multi(refl_flat, s_flat, v_flat, n_flat, active, out_shape, return_info)
+        return _invert_lunar_lambert_multi(
+            refl_flat, s_flat, v_flat, n_flat, active, out_shape, return_info
+        )
 
     # When sun/view are constant per image, share the (n_images, 3) arrays
     # across all pixels (in_axes=None). This avoids materialising
@@ -496,11 +758,30 @@ def invert_albedo_multi(
 
     if model == "amsa":
         h_cb, b0_cb = params.coherent_backscatter
-        solver = _invert_multi_amsa_shared_jit if shared_geometry else _invert_multi_amsa_jit
-        model_params = (params.legendre_coefficients, float(params.tb), float(params.hs), float(params.Bs0), float(h_cb), float(b0_cb))
+        solver = (
+            _invert_multi_amsa_shared_jit if shared_geometry else _invert_multi_amsa_jit
+        )
+        model_params = (
+            params.legendre_coefficients,
+            float(params.tb),
+            float(params.hs),
+            float(params.Bs0),
+            float(h_cb),
+            float(b0_cb),
+        )
     else:
-        solver = _invert_multi_imsa_modified_h_shared_jit if shared_geometry else _invert_multi_imsa_modified_h_jit
-        model_params = (float(params.b), float(params.c), float(params.tb), float(params.h), float(params.b0))
+        solver = (
+            _invert_multi_imsa_modified_h_shared_jit
+            if shared_geometry
+            else _invert_multi_imsa_modified_h_jit
+        )
+        model_params = (
+            float(params.b),
+            float(params.c),
+            float(params.tb),
+            float(params.h),
+            float(params.b0),
+        )
 
     w_sol, residuals, converged, iterations = solver(
         jnp.asarray(refl_flat.T),
@@ -536,14 +817,18 @@ def _invert_lunar_lambert_multi(
 ) -> npt.NDArray | MultiImageInversionResult:
     n_images, n_pixels = refl_flat.shape
     n_stack = np.broadcast_to(n_flat[None, :, :], (n_images, n_pixels, 3))
-    th_i, th_e, alpha = _geometry_angles_jax(jnp.asarray(s_flat), jnp.asarray(v_flat), jnp.asarray(n_stack))
+    th_i, th_e, alpha = _geometry_angles_jax(
+        jnp.asarray(s_flat), jnp.asarray(v_flat), jnp.asarray(n_stack)
+    )
     factors = np.asarray(lunar_lambert(jnp.ones_like(th_i), th_i, th_e, alpha))
     weights = active & np.isfinite(factors) & np.isfinite(refl_flat)
     numerator = np.sum(np.where(weights, refl_flat * factors, 0.0), axis=0)
     denominator = np.sum(np.where(weights, factors**2, 0.0), axis=0)
     rho = np.where(denominator > 0.0, numerator / denominator, np.nan)
     model_refl = rho[None, :] * factors
-    residuals = 0.5 * np.sum(np.where(weights, (model_refl - refl_flat) ** 2, 0.0), axis=0)
+    residuals = 0.5 * np.sum(
+        np.where(weights, (model_refl - refl_flat) ** 2, 0.0), axis=0
+    )
     rho_image = rho.reshape(out_shape)
     if not return_info:
         return rho_image
@@ -586,10 +871,14 @@ def _vectors_to_flat(v: npt.ArrayLike) -> tuple[np.ndarray, tuple[int, ...]]:
     if arr.ndim >= 2 and arr.shape[0] == 3:
         moved = np.moveaxis(arr, 0, -1)
         return np.ascontiguousarray(moved.reshape(-1, 3)), moved.shape[:-1]
-    raise ValueError(f"Expected vector array with a length-3 axis, got shape {arr.shape}")
+    raise ValueError(
+        f"Expected vector array with a length-3 axis, got shape {arr.shape}"
+    )
 
 
-def _infer_output_shape(w: np.ndarray, *geometry_shapes: tuple[int, ...]) -> tuple[int, ...]:
+def _infer_output_shape(
+    w: np.ndarray, *geometry_shapes: tuple[int, ...]
+) -> tuple[int, ...]:
     if w.ndim > 0 and w.size != 1:
         return w.shape
     for shape in geometry_shapes:
@@ -606,7 +895,9 @@ def _broadcast_vectors(v: np.ndarray, n_pixels: int, name: str) -> np.ndarray:
     raise ValueError(f"{name} has {v.shape[0]} vectors, expected 1 or {n_pixels}")
 
 
-def _field_to_flat(field: npt.ArrayLike, out_shape: tuple[int, ...], n_pixels: int, name: str) -> np.ndarray:
+def _field_to_flat(
+    field: npt.ArrayLike, out_shape: tuple[int, ...], n_pixels: int, name: str
+) -> np.ndarray:
     arr = np.asarray(field, dtype=float)
     if arr.size == 1:
         return np.full(n_pixels, float(arr.reshape(-1)[0]))
@@ -614,7 +905,9 @@ def _field_to_flat(field: npt.ArrayLike, out_shape: tuple[int, ...], n_pixels: i
         return np.ascontiguousarray(arr.reshape(-1))
     if arr.size == n_pixels:
         return np.ascontiguousarray(arr.reshape(-1))
-    raise ValueError(f"{name} has shape {arr.shape}, expected scalar, {out_shape}, or {n_pixels} values")
+    raise ValueError(
+        f"{name} has shape {arr.shape}, expected scalar, {out_shape}, or {n_pixels} values"
+    )
 
 
 def _valid_geometry(s: np.ndarray, v: np.ndarray, n: np.ndarray) -> np.ndarray:
@@ -631,13 +924,17 @@ def _normalize_np(v: np.ndarray) -> np.ndarray:
     return v / norm
 
 
-def _geometry_angles(s: np.ndarray, v: np.ndarray, n: np.ndarray) -> tuple[jax.Array, jax.Array, jax.Array]:
+def _geometry_angles(
+    s: np.ndarray, v: np.ndarray, n: np.ndarray
+) -> tuple[jax.Array, jax.Array, jax.Array]:
     # Deprecated: unused NumPy convenience wrapper around
     # _geometry_angles_jax; kept for potential external callers.
     return _geometry_angles_jax(jnp.asarray(s), jnp.asarray(v), jnp.asarray(n))
 
 
-def _geometry_angles_jax(s: jax.Array, v: jax.Array, n: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
+def _geometry_angles_jax(
+    s: jax.Array, v: jax.Array, n: jax.Array
+) -> tuple[jax.Array, jax.Array, jax.Array]:
     s_j = _normalize_jnp(s)
     v_j = _normalize_jnp(v)
     n_j = _normalize_jnp(n)
@@ -674,7 +971,9 @@ def _format_invalid(
     return out_np
 
 
-def _image_stack_to_flat(stack: npt.ArrayLike, name: str) -> tuple[np.ndarray, tuple[int, ...]]:
+def _image_stack_to_flat(
+    stack: npt.ArrayLike, name: str
+) -> tuple[np.ndarray, tuple[int, ...]]:
     arr = np.asarray(stack, dtype=float)
     if arr.ndim < 2:
         raise ValueError(f"{name} must have shape (n_images, ...), got {arr.shape}")
@@ -691,7 +990,9 @@ def _as_per_image_vectors(geometry: npt.ArrayLike, n_images: int) -> np.ndarray 
     return None
 
 
-def _geometry_stack_to_flat(stack: npt.ArrayLike, n_images: int, n_pixels: int, name: str) -> np.ndarray:
+def _geometry_stack_to_flat(
+    stack: npt.ArrayLike, n_images: int, n_pixels: int, name: str
+) -> np.ndarray:
     arr = np.asarray(stack, dtype=float)
     if arr.ndim == 1 and arr.shape == (3,):
         return np.broadcast_to(arr, (n_images, n_pixels, 3))
@@ -707,10 +1008,14 @@ def _geometry_stack_to_flat(stack: npt.ArrayLike, n_images: int, n_pixels: int, 
         flat = arr.reshape(1, -1, 3)
         if flat.shape[1] == n_pixels:
             return np.broadcast_to(flat, (n_images, n_pixels, 3))
-    raise ValueError(f"{name} geometry has shape {arr.shape}, expected image stack geometry")
+    raise ValueError(
+        f"{name} geometry has shape {arr.shape}, expected image stack geometry"
+    )
 
 
-def _active_mask_stack(reflectance: np.ndarray, mask: npt.ArrayLike | None) -> np.ndarray:
+def _active_mask_stack(
+    reflectance: np.ndarray, mask: npt.ArrayLike | None
+) -> np.ndarray:
     active = np.isfinite(reflectance)
     if mask is None:
         return active
@@ -720,8 +1025,12 @@ def _active_mask_stack(reflectance: np.ndarray, mask: npt.ArrayLike | None) -> n
     if mask_arr.shape == reflectance.shape[1:]:
         return active & np.broadcast_to(mask_arr, reflectance.shape)
     if mask_arr.size == reflectance[0].size:
-        return active & np.broadcast_to(mask_arr.reshape(reflectance.shape[1:]), reflectance.shape)
-    raise ValueError(f"mask has shape {mask_arr.shape}, expected {reflectance.shape} or {reflectance.shape[1:]}")
+        return active & np.broadcast_to(
+            mask_arr.reshape(reflectance.shape[1:]), reflectance.shape
+        )
+    raise ValueError(
+        f"mask has shape {mask_arr.shape}, expected {reflectance.shape} or {reflectance.shape[1:]}"
+    )
 
 
 def _smooth_inversion_inputs(
@@ -740,7 +1049,9 @@ def _smooth_inversion_inputs(
         reflectance_smooth[k] = _masked_gaussian(reflectance[k], active[k], sigma)
         active_smooth[k] = active[k] & np.isfinite(reflectance_smooth[k])
 
-    normal_smooth = _smooth_geometry_image(n, np.any(active, axis=0), image_shape, sigma)
+    normal_smooth = _smooth_geometry_image(
+        n, np.any(active, axis=0), image_shape, sigma
+    )
     sun_smooth = _smooth_geometry_stack(s, active, image_shape, sigma, n_images)
     view_smooth = _smooth_geometry_stack(v, active, image_shape, sigma, n_images)
     return reflectance_smooth, sun_smooth, view_smooth, normal_smooth, active_smooth
@@ -761,14 +1072,19 @@ def _smooth_geometry_stack(
     if geometry_arr.ndim == 2 and geometry_arr.shape == (n_images, 3):
         return geometry_arr
     if geometry_arr.shape == (*image_shape, 3):
-        geometry_arr = np.broadcast_to(geometry_arr[None, ...], (n_images, *image_shape, 3)).copy()
+        geometry_arr = np.broadcast_to(
+            geometry_arr[None, ...], (n_images, *image_shape, 3)
+        ).copy()
     if geometry_arr.shape != (n_images, *image_shape, 3):
         raise ValueError(
             f"geometry has shape {geometry_arr.shape}, expected (3,), ({n_images}, 3), "
             f"{(*image_shape, 3)}, or {(n_images, *image_shape, 3)}"
         )
     return np.stack(
-        [_smooth_geometry_image(geometry_arr[k], active[k], image_shape, sigma) for k in range(n_images)]
+        [
+            _smooth_geometry_image(geometry_arr[k], active[k], image_shape, sigma)
+            for k in range(n_images)
+        ]
     )
 
 
@@ -780,9 +1096,13 @@ def _smooth_geometry_image(
 ) -> np.ndarray:
     geometry_arr = np.asarray(geometry, dtype=float)
     if geometry_arr.ndim == 1 and geometry_arr.shape == (3,):
-        return np.broadcast_to(geometry_arr.reshape((1,) * len(image_shape) + (3,)), (*image_shape, 3)).copy()
+        return np.broadcast_to(
+            geometry_arr.reshape((1,) * len(image_shape) + (3,)), (*image_shape, 3)
+        ).copy()
     if geometry_arr.shape != (*image_shape, 3):
-        raise ValueError(f"geometry has shape {geometry_arr.shape}, expected {(*image_shape, 3)}")
+        raise ValueError(
+            f"geometry has shape {geometry_arr.shape}, expected {(*image_shape, 3)}"
+        )
     geometry_arr = _normalize_np(geometry_arr)
     nz = geometry_arr[..., 2]
     slope_valid = valid & np.isfinite(geometry_arr).all(axis=-1) & (np.abs(nz) > 1e-12)
@@ -791,14 +1111,20 @@ def _smooth_geometry_image(
     p_smooth = _masked_gaussian(p, slope_valid, sigma)
     q_smooth = _masked_gaussian(q, slope_valid, sigma)
     fallback = _normalize_np(geometry_arr.reshape(-1, 3)).reshape(geometry_arr.shape)
-    smooth = _gradient_normals(p_smooth.reshape(-1), q_smooth.reshape(-1)).reshape(geometry_arr.shape)
+    smooth = _gradient_normals(p_smooth.reshape(-1), q_smooth.reshape(-1)).reshape(
+        geometry_arr.shape
+    )
     return np.where(np.isfinite(smooth).all(axis=-1, keepdims=True), smooth, fallback)
 
 
 def _masked_gaussian(values: np.ndarray, valid: np.ndarray, sigma: float) -> np.ndarray:
     valid = valid & np.isfinite(values)
-    weights = gaussian_filter(valid.astype(float), sigma=sigma, mode="constant", cval=0.0)
-    numerator = gaussian_filter(np.where(valid, values, 0.0), sigma=sigma, mode="constant", cval=0.0)
+    weights = gaussian_filter(
+        valid.astype(float), sigma=sigma, mode="constant", cval=0.0
+    )
+    numerator = gaussian_filter(
+        np.where(valid, values, 0.0), sigma=sigma, mode="constant", cval=0.0
+    )
     return np.where(weights > 1e-12, numerator / weights, np.nan)
 
 
@@ -880,7 +1206,9 @@ def _invert_multi_pixel(
         loss_new = 0.5 * jnp.sum(residual_new**2)
         improved = loss_new < loss
         x = jnp.where(improved, x_new, x)
-        lam = jnp.where(improved, jnp.maximum(lam * 0.3, 1e-7), jnp.minimum(lam * 2.0, 1e7))
+        lam = jnp.where(
+            improved, jnp.maximum(lam * 0.3, 1e-7), jnp.minimum(lam * 2.0, 1e7)
+        )
         converged = converged | (jnp.abs(grad) < 1e-10) | (jnp.abs(delta) < 1e-10)
         return x, lam, jnp.where(improved, loss_new, loss), converged, step + 1
 
@@ -897,14 +1225,20 @@ def _invert_multi_pixel(
 
 
 _invert_multi_amsa_jit = jax.jit(
-    jax.vmap(_invert_multi_pixel, in_axes=(0, 0, 0, 0, 0, 0, None, None, None, None, None, None, None)),
+    jax.vmap(
+        _invert_multi_pixel,
+        in_axes=(0, 0, 0, 0, 0, 0, None, None, None, None, None, None, None),
+    ),
     static_argnums=(12,),
 )
 
 # Variant sharing the per-image (n_images, 3) sun/view arrays across pixels;
 # used when the geometry is constant per image (the common case).
 _invert_multi_amsa_shared_jit = jax.jit(
-    jax.vmap(_invert_multi_pixel, in_axes=(0, None, None, 0, 0, 0, None, None, None, None, None, None, None)),
+    jax.vmap(
+        _invert_multi_pixel,
+        in_axes=(0, None, None, 0, 0, 0, None, None, None, None, None, None, None),
+    ),
     static_argnums=(12,),
 )
 
@@ -942,7 +1276,9 @@ def _invert_multi_imsa_modified_h_pixel(
         loss_new = 0.5 * jnp.sum(residual_new**2)
         improved = loss_new < loss
         x = jnp.where(improved, x_new, x)
-        lam = jnp.where(improved, jnp.maximum(lam * 0.3, 1e-7), jnp.minimum(lam * 2.0, 1e7))
+        lam = jnp.where(
+            improved, jnp.maximum(lam * 0.3, 1e-7), jnp.minimum(lam * 2.0, 1e7)
+        )
         converged = converged | (jnp.abs(grad) < 1e-10) | (jnp.abs(delta) < 1e-10)
         return x, lam, jnp.where(improved, loss_new, loss), converged, step + 1
 
