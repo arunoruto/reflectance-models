@@ -23,7 +23,8 @@ in
 {
   overlays = [
     (final: prev: {
-      unstable = import inputs.nixpkgs-unstable {
+      # unstable = import inputs.nixpkgs-unstable {
+      unstable = import inputs.nixpkgs {
         inherit (final.stdenv.hostPlatform) system;
         config = {
           allowUnfree = true;
@@ -103,7 +104,7 @@ in
           "docs"
           "profiling"
         ];
-        extras = ["jax-gpu"];
+        extras = [ "jax-gpu" ];
       };
     };
 

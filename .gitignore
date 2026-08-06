@@ -133,3 +133,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# MATLAB reference sources are external material - never vendored here
+*.m
+
+# Benchmark results are machine-specific; the harness and spec are tracked,
+# the numbers are not (the README records a reference run).
+benchmark/benchmark-python-*.json
