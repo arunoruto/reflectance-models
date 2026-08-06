@@ -5,9 +5,17 @@ import numpy as np
 import numpy.typing as npt
 from pydantic import BaseModel, ConfigDict, Field
 
-from ._core import coef_a, cs_legendre_coefficients, dhg_legendre_coefficients
+from ._core import (
+    coef_a,
+    cs_legendre_coefficients,
+    dhg_legendre_coefficients,
+    dhg_truncation_error,
+    recommended_dhg_order,
+)
 from .amsa import amsa  # noqa: F401
+from .cornette import amsa_cornette, cornette_legendre_coefficients, imsa_cornette  # noqa: F401
 from .imsa import imsa  # noqa: F401
+from .imsa_modified import imsa_modified_h  # noqa: F401
 from .inverse import (
     AmsaInversionState,
     invert_amsa,
@@ -19,11 +27,17 @@ from .mimsa import mimsa  # noqa: F401
 __all__ = [
     "amsa",
     "imsa",
+    "imsa_modified_h",
     "mimsa",
+    "amsa_cornette",
+    "imsa_cornette",
     "Hapke",
     "coef_a",
     "dhg_legendre_coefficients",
+    "dhg_truncation_error",
+    "recommended_dhg_order",
     "cs_legendre_coefficients",
+    "cornette_legendre_coefficients",
     "AmsaInversionState",
     "invert_amsa",
     "invert_amsa_precomputed",
@@ -81,6 +95,8 @@ class Hapke(BaseModel):
 
     @staticmethod
     def _broadcast_to_shape(a: np.ndarray, target_shape: tuple[int, ...]) -> np.ndarray:
+        # Deprecated: currently unused (refl/albedo broadcast inline); kept
+        # for potential external callers until the next major release.
         if a.ndim >= len(target_shape) + 1:
             return a
         a = a.squeeze()

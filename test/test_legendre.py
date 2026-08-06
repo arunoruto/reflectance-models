@@ -76,6 +76,18 @@ def test_consistency_phase_legendre():
     )
 
 
+def test_dhg_external_c_convention_is_direct():
+    b = 0.21
+    c_value = 0.7
+    cos_g = jnp.array([-0.5, 0.0, 0.5])
+    b_n = dhg_legendre_coefficients(b, c_value, n=200)
+
+    p_legendre = jax.vmap(legendre_eval, in_axes=(0, None))(cos_g, b_n)
+    p_explicit = double_henyey_greenstein(cos_g, b, c_value)
+
+    np.testing.assert_allclose(np.array(p_legendre), np.array(p_explicit), rtol=1e-5, atol=1e-8)
+
+
 def test_function_p_compatible():
     N = 15
     b = 0.21
@@ -94,13 +106,19 @@ def test_function_p_compatible():
 
 
 def test_value_p_compatible():
+    import warnings
+
     N = 5
     b = 0.21
     c_value = 0.7
     a_n = coef_a(n=N)
     range_n = np.arange(N + 1)
     b_n_old = c_value * (2 * range_n + 1) * np.power(b, range_n)
-    b_n_new = dhg_legendre_coefficients(b, c_value, n=N)
+    with warnings.catch_warnings():
+        # The deliberately short N=5 expansion triggers the truncation
+        # warning; this test only checks coefficient-convention parity.
+        warnings.simplefilter("ignore", UserWarning)
+        b_n_new = dhg_legendre_coefficients(b, c_value, n=N)
 
     v_old = np.array(value_p(jnp.array(b_n_old), a_n))
     v_new = np.array(value_p(b_n_new, a_n))
