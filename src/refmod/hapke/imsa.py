@@ -56,7 +56,11 @@ def _refl_imsa_scalar(
     i = normalize(i)
     e = normalize(e)
     n = normalize(n)
+    # Raw-cosine mask: the roughness correction is undefined for
+    # back-facing geometry and can yield spurious positive cosines.
+    invalid = (cos_angle(i, n) <= 0.0) | (cos_angle(e, n) <= 0.0)
     s, mu0, mu = roughness_correction(roughness, i, e, n)
+    invalid = invalid | (mu <= 0.0) | (mu0 <= 0.0)
     cos_alpha = cos_angle(i, e)
     p = legendre_eval(cos_alpha, b_n)
     h_mu0 = h_function(mu0, w)
@@ -64,7 +68,7 @@ def _refl_imsa_scalar(
     m = h_mu0 * h_mu - 1.0
     albedo_indep = mu0 / (mu0 + mu) * s / (4.0 * jnp.pi)
     refl = albedo_indep * w * (p + m)
-    return jnp.where((mu <= 0.0) | (mu0 <= 0.0), jnp.nan, refl)
+    return jnp.where(invalid, jnp.nan, refl)
 
 
 _imsa_batched = jax.vmap(

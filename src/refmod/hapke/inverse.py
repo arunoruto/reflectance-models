@@ -51,7 +51,14 @@ def _adaptive_chunk_size(n_pixels: int) -> int:
         return 0
 
     def _safe_chunk_count(usable_bytes: float) -> int:
-        return min(max(1, int(usable_bytes / _BYTES_PER_PIXEL)), n_pixels)
+        chunk = min(max(1, int(usable_bytes / _BYTES_PER_PIXEL)), n_pixels)
+        if chunk < n_pixels:
+            # Quantize to a power of two so the chunk size (and therefore
+            # the compiled kernel shape) is stable across runs and machines
+            # instead of tracking the currently available memory. Every
+            # distinct shape costs a full XLA compile.
+            chunk = 1 << (chunk.bit_length() - 1)
+        return chunk
 
     try:
         device = jax.local_devices()[0]
@@ -238,15 +245,29 @@ def prepare_amsa_inversion(
         pre = precompute_amsa(b_n, i, e, n, roughness, h_sh, b0_sh, h_cb, b0_cb)
         return AmsaInversionState(((0, n_pixels, pre),), n_pixels, chunk_size)
 
+    def _pad_vectors(arr: jax.Array, count: int) -> jax.Array:
+        # Pad with a valid dummy direction; the padded pixels are masked out
+        # via NaN observations during the solve.
+        pad = jnp.broadcast_to(jnp.asarray([0.0, 0.0, 1.0], dtype=arr.dtype), (count, 3))
+        return jnp.concatenate((arr, pad), axis=0)
+
     chunks = []
     for start in range(0, n_pixels, chunk_size):
         end = min(start + chunk_size, n_pixels)
         sl = slice(start, end)
+        i_c, e_c, n_c = i[sl], e[sl], n[sl]
+        if end - start < chunk_size:
+            # Pad the remainder chunk to the common chunk shape so all
+            # chunks reuse one compiled kernel.
+            pad_count = chunk_size - (end - start)
+            i_c = _pad_vectors(i_c, pad_count)
+            e_c = _pad_vectors(e_c, pad_count)
+            n_c = _pad_vectors(n_c, pad_count)
         pre = precompute_amsa(
             b_n,
-            i[sl],
-            e[sl],
-            n[sl],
+            i_c,
+            e_c,
+            n_c,
             roughness,
             h_sh,
             b0_sh,
@@ -310,8 +331,17 @@ def invert_amsa_precomputed(
     w_sol = jnp.empty_like(refl_obs)
     for start, end, pre in state.chunks:
         sl = slice(start, end)
+        refl_c = refl_obs[sl]
+        w0_c = w0_local[sl]
+        count = end - start
+        if count < state.chunk_size:
+            # Remainder chunk was padded at preparation time; pad the
+            # observations with NaN (inactive) to the common shape.
+            pad = state.chunk_size - count
+            refl_c = jnp.concatenate((refl_c, jnp.full(pad, jnp.nan, refl_c.dtype)))
+            w0_c = jnp.concatenate((w0_c, jnp.full(pad, 1.0 / 3.0, w0_c.dtype)))
         w_sol = w_sol.at[sl].set(
-            _invert_chunk_jit(refl_obs[sl], pre, w0_local[sl], max_steps)
+            _invert_chunk_jit(refl_c, pre, w0_c, max_steps)[:count]
         )
 
     return w_sol

@@ -1,7 +1,13 @@
+import warnings
+
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 from refmod.config import EPS
+
+DHG_TRUNCATION_WARN_THRESHOLD = 1e-4
+"""Truncation-error bound above which :func:`dhg_legendre_coefficients` warns."""
 
 
 def normalize(v: jax.Array) -> jax.Array:
@@ -45,8 +51,8 @@ def cos_angle(a: jax.Array, b: jax.Array) -> jax.Array:
 def h_function(x: jax.Array, w: jax.Array) -> jax.Array:
     r"""Hapke isotropic multiple-scattering H-function.
 
-    Computes the Ambartsumian–Chandrasekhar H-function using the
-    Cornette & Shanks level 2 approximation:
+    Computes the Ambartsumian–Chandrasekhar H-function using Hapke's
+    level-2 approximation (Hapke 2002, Eq. 13):
 
     .. math::
 
@@ -70,7 +76,7 @@ def h_function(x: jax.Array, w: jax.Array) -> jax.Array:
 
     References
     ----------
-    :cite:p:`Cornette-1992`
+    :cite:p:`Hapke-2002`
     """
     gamma = jnp.sqrt(1.0 - w)
     r0 = (1.0 - gamma) / (1.0 + gamma)
@@ -81,8 +87,12 @@ def h_function(x: jax.Array, w: jax.Array) -> jax.Array:
 def h_function_derivative(x: jax.Array, w: jax.Array) -> jax.Array:
     r"""Derivative of the H-function with respect to single-scattering albedo.
 
-    Computes :math:`\partial H(x, w) / \partial w` using the Cornette &
-    Shanks level 2 approximation.
+    Computes :math:`\partial H(x, w) / \partial w` of Hapke's level-2
+    approximation (see :func:`h_function`).
+
+    Note: kept alongside JAX autodiff on purpose — it matches the MATLAB
+    ``hapke_amsa.m`` derivative exactly and is marginally faster than
+    ``jax.jvp`` of the forward model.
 
     Parameters
     ----------
@@ -98,7 +108,7 @@ def h_function_derivative(x: jax.Array, w: jax.Array) -> jax.Array:
 
     References
     ----------
-    :cite:p:`Cornette-1992`
+    :cite:p:`Hapke-2002`
     """
     gamma = jnp.sqrt(1.0 - w)
     r0 = (1.0 - gamma) / (1.0 + gamma)
@@ -147,6 +157,77 @@ def coef_a(n: int = 15) -> jax.Array:
     return a_n
 
 
+def dhg_truncation_error(b: float, c: float, n: int) -> float:
+    r"""Upper bound on the truncation error of the DHG Legendre expansion.
+
+    The DHG phase function has the exact expansion
+    :math:`p(x) = \sum_k b_k P_k(x)` with
+    :math:`|b_k| \leq \max(1, |c|)\,(2k+1)\,|b|^k` and :math:`|P_k(x)| \leq 1`,
+    so the absolute error of truncating after order *n* is bounded by the
+    tail sum
+
+    .. math::
+
+        \epsilon_n \leq \max(1, |c|) \sum_{k=n+1}^{\infty} (2k+1)\,|b|^k .
+
+    Parameters
+    ----------
+    b : float
+        Asymmetry parameter (:math:`|b| < 1`).
+    c : float
+        Backscatter fraction.
+    n : int
+        Truncation order.
+
+    Returns
+    -------
+    float
+        Upper bound on the max absolute error of the reconstructed phase
+        function. ``inf`` if :math:`|b| \geq 1`.
+    """
+    t = abs(b)
+    if t >= 1.0:
+        return float("inf")
+    if t == 0.0:
+        return 0.0
+    m = n + 1
+    s1 = t**m / (1.0 - t)
+    s2 = t**m * (m - (m - 1) * t) / (1.0 - t) ** 2
+    return max(1.0, abs(c)) * (2.0 * s2 + s1)
+
+
+def recommended_dhg_order(
+    b: float,
+    c: float,
+    tol: float = DHG_TRUNCATION_WARN_THRESHOLD,
+    max_order: int = 300,
+) -> int:
+    r"""Smallest Legendre order whose truncation-error bound is below *tol*.
+
+    See :func:`dhg_truncation_error` for the bound.
+
+    Parameters
+    ----------
+    b : float
+        Asymmetry parameter.
+    c : float
+        Backscatter fraction.
+    tol : float, optional
+        Target error bound.
+    max_order : int, optional
+        Upper limit for the search (returned if no order satisfies *tol*).
+
+    Returns
+    -------
+    int
+        Recommended number of Legendre orders.
+    """
+    for k in range(1, max_order + 1):
+        if dhg_truncation_error(b, c, k) < tol:
+            return k
+    return max_order
+
+
 def dhg_legendre_coefficients(b: float, c: float, n: int = 15) -> jax.Array:
     r"""Legendre expansion coefficients for the Double Henyey–Greenstein phase function.
 
@@ -173,10 +254,31 @@ def dhg_legendre_coefficients(b: float, c: float, n: int = 15) -> jax.Array:
     jax.Array
         Array of Legendre coefficients :math:`b_n` of length *n+1*.
 
+    Notes
+    -----
+    When *b* and *c* are plain scalars, the truncation error of the series
+    is checked against ``DHG_TRUNCATION_WARN_THRESHOLD`` and a warning with
+    a recommended order is emitted if the reconstruction of the phase
+    function would be too inaccurate (relevant for strongly peaked phase
+    functions, roughly :math:`|b| \gtrsim 0.4` at the default order).
+
     References
     ----------
     :cite:p:`Henyey-1941`
     """
+    if isinstance(b, (int, float, np.floating)) and isinstance(
+        c, (int, float, np.floating)
+    ):
+        err = dhg_truncation_error(float(b), float(c), n)
+        if err > DHG_TRUNCATION_WARN_THRESHOLD:
+            warnings.warn(
+                f"Truncating the DHG Legendre expansion at order {n} for "
+                f"b={float(b):g}, c={float(c):g} leaves a phase-function "
+                f"error bound of {err:.2e}. Consider n="
+                f"{recommended_dhg_order(float(b), float(c))} for an error "
+                f"below {DHG_TRUNCATION_WARN_THRESHOLD:g}.",
+                stacklevel=2,
+            )
     range_n = jnp.arange(n + 1, dtype=jnp.float64)
     b_n = (2.0 * range_n + 1.0) * jnp.power(b, range_n)
     b_n = b_n.at[1::2].multiply(c)
@@ -185,6 +287,14 @@ def dhg_legendre_coefficients(b: float, c: float, n: int = 15) -> jax.Array:
 
 def cs_legendre_coefficients(xi: float, n: int = 15) -> jax.Array:
     r"""Legendre expansion coefficients for the Cornette–Shanks phase function.
+
+    .. deprecated:: 1.1
+        Unvalidated and likely misaligned: the returned coefficients start
+        at order 1 (not 0), so they are shifted by one order relative to
+        what :func:`legendre_eval` and :func:`function_p` expect. Use
+        :func:`refmod.hapke.cornette.cornette_legendre_coefficients` (the
+        MATLAB-derived variant) if Cornette support is needed. Kept for
+        reference until the Cornette models are validated.
 
     Parameters
     ----------
@@ -274,9 +384,10 @@ def cornette_shanks(cos_g: jax.Array, xi: float) -> jax.Array:
 
 
 def legendre_eval(x: jax.Array, b_n: jax.Array) -> jax.Array:
-    r"""Evaluate a Legendre polynomial series using Clenshaw recurrence.
+    r"""Evaluate a Legendre polynomial series via the Bonnet recurrence.
 
-    Computes :math:`\sum_{n=0}^{N} b_n P_n(x)`.
+    Computes :math:`\sum_{n=0}^{N} b_n P_n(x)` using the three-term
+    recurrence :math:`n P_n = (2n-1) x P_{n-1} - (n-1) P_{n-2}`.
 
     Parameters
     ----------
@@ -443,7 +554,11 @@ def coherent_backscatter(tan_alpha_2: jax.Array, h: float, b0: float) -> jax.Arr
     :cite:p:`Hapke-2002`
     """
     hc_2 = tan_alpha_2 / jnp.maximum(h, EPS)
-    bc = 0.5 * (1.0 + (1.0 - jnp.exp(-hc_2)) / (hc_2 + EPS)) / (1.0 + hc_2) ** 2
+    # (1 - exp(-x)) / x -> 1 as x -> 0; guard the division so the limit is
+    # exact at opposition (double-where keeps gradients NaN-free).
+    hc_2_safe = jnp.where(hc_2 > EPS, hc_2, 1.0)
+    ratio = jnp.where(hc_2 > EPS, -jnp.expm1(-hc_2_safe) / hc_2_safe, 1.0)
+    bc = 0.5 * (1.0 + ratio) / (1.0 + hc_2) ** 2
     return jnp.where((b0 != 0.0) & (h != 0.0), 1.0 + b0 * bc, 1.0)
 
 
@@ -613,11 +728,13 @@ def _roughness_impl(
             / (2.0 - _fe(cot_c, cot_rough) - _psi / jnp.pi * _fe(cot_d, cot_rough))
         )
 
+    # Both effective cosines share the same denominator within a branch
+    # (Hapke 1984, Eqs. 47-50), including the psi/pi * E1 term.
     cos_i_s_ile = _cos_s_one(
         cos_i, sin_i, cos_psi, psi, sin_psi_div_2_sq, cot_e, cot_i, cot_e, cot_i
     )
     cos_i_s_ige = _cos_s_one(
-        cos_i, sin_i, 1.0, 0.0, -sin_psi_div_2_sq, cot_i, cot_e, cot_i, cot_e
+        cos_i, sin_i, 1.0, psi, -sin_psi_div_2_sq, cot_i, cot_e, cot_i, cot_e
     )
     cos_i_s = jnp.where(ile, cos_i_s_ile, cos_i_s_ige)
 
@@ -625,7 +742,7 @@ def _roughness_impl(
         cos_e, sin_e, cos_psi, psi, sin_psi_div_2_sq, cot_i, cot_e, cot_i, cot_e
     )
     cos_e_s_ile = _cos_s_one(
-        cos_e, sin_e, 1.0, 0.0, -sin_psi_div_2_sq, cot_e, cot_i, cot_e, cot_i
+        cos_e, sin_e, 1.0, psi, -sin_psi_div_2_sq, cot_e, cot_i, cot_e, cot_i
     )
     cos_e_s = jnp.where(ile, cos_e_s_ile, cos_e_s_ige)
 

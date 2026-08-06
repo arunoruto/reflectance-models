@@ -75,7 +75,12 @@ def _refl_amsa_scalar(
     i = normalize(i)
     e = normalize(e)
     n = normalize(n)
+    # Mask on the raw cosines too: the roughness correction is only defined
+    # for 0 <= i, e <= 90 deg and produces spurious positive effective
+    # cosines for back-facing geometry.
+    invalid = (cos_angle(i, n) <= 0.0) | (cos_angle(e, n) <= 0.0)
     s, mu0, mu = roughness_correction(roughness, i, e, n)
+    invalid = invalid | (mu <= 0.0) | (mu0 <= 0.0)
     cos_alpha = cos_angle(i, e)
     tan_alpha_2 = jnp.sqrt(1.0 - cos_alpha**2) / (1.0 + cos_alpha)
     p = legendre_eval(cos_alpha, b_n)
@@ -92,7 +97,7 @@ def _refl_amsa_scalar(
     b_cb = coherent_backscatter(tan_alpha_2, h_cb, b0_cb)
     albedo_indep = mu0 / (mu0 + mu) * s / (4.0 * jnp.pi) * b_cb
     refl = albedo_indep * w * (p_sh + m)
-    return jnp.where((mu <= 0.0) | (mu0 <= 0.0), jnp.nan, refl)
+    return jnp.where(invalid, jnp.nan, refl)
 
 
 def _refl_amsa_scalar_and_grad(
@@ -155,7 +160,9 @@ def _refl_amsa_scalar_and_grad(
     i = normalize(i)
     e = normalize(e)
     n = normalize(n)
+    invalid = (cos_angle(i, n) <= 0.0) | (cos_angle(e, n) <= 0.0)
     s, mu0, mu = roughness_correction(roughness, i, e, n)
+    invalid = invalid | (mu <= 0.0) | (mu0 <= 0.0)
     cos_alpha = cos_angle(i, e)
     tan_alpha_2 = jnp.sqrt(1.0 - cos_alpha**2) / (1.0 + cos_alpha)
     p = legendre_eval(cos_alpha, b_n)
@@ -179,8 +186,8 @@ def _refl_amsa_scalar_and_grad(
     bracket = p_sh + m
     refl = albedo_indep * w * bracket
     d_refl = albedo_indep * (bracket + w * dm_dw)
-    refl = jnp.where((mu <= 0.0) | (mu0 <= 0.0), jnp.nan, refl)
-    d_refl = jnp.where((mu <= 0.0) | (mu0 <= 0.0), 0.0, d_refl)
+    refl = jnp.where(invalid, jnp.nan, refl)
+    d_refl = jnp.where(invalid, 0.0, d_refl)
     return refl, d_refl
 
 
@@ -248,6 +255,7 @@ def _precompute_amsa_scalar(
     i = normalize(i)
     e = normalize(e)
     n = normalize(n)
+    valid_raw = (cos_angle(i, n) > 0.0) & (cos_angle(e, n) > 0.0)
     s, mu0, mu = roughness_correction(roughness, i, e, n)
     cos_alpha = cos_angle(i, e)
     tan_alpha_2 = jnp.sqrt(1.0 - cos_alpha**2) / (1.0 + cos_alpha)
@@ -269,7 +277,7 @@ def _precompute_amsa_scalar(
         P=P,
         mu0=mu0,
         mu=mu,
-        valid=(mu > 0.0) & (mu0 > 0.0),
+        valid=valid_raw & (mu > 0.0) & (mu0 > 0.0),
     )
 
 

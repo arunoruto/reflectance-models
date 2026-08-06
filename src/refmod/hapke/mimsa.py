@@ -65,7 +65,11 @@ def _refl_mimsa_scalar(
     i = normalize(i)
     e = normalize(e)
     n = normalize(n)
+    # Raw-cosine mask: the roughness correction is undefined for
+    # back-facing geometry and can yield spurious positive cosines.
+    invalid = (cos_angle(i, n) <= 0.0) | (cos_angle(e, n) <= 0.0)
     s, mu0, mu = roughness_correction(roughness, i, e, n)
+    invalid = invalid | (mu <= 0.0) | (mu0 <= 0.0)
     cos_alpha = cos_angle(i, e)
     p = legendre_eval(cos_alpha, b_n)
     h_mu0 = h_function(mu0, w)
@@ -78,7 +82,7 @@ def _refl_mimsa_scalar(
     m = p_mu0 * (h_mu - 1.0) + p_mu * (h_mu0 - 1.0) + P * (h_mu0 - 1.0) * (h_mu - 1.0)
     albedo_indep = mu0 / (mu0 + mu) * s / (4.0 * jnp.pi)
     refl = albedo_indep * w * (p + m)
-    return jnp.where((mu <= 0.0) | (mu0 <= 0.0), jnp.nan, refl)
+    return jnp.where(invalid, jnp.nan, refl)
 
 
 _mimsa_batched = jax.vmap(
@@ -101,6 +105,12 @@ def mimsa(
     Vectorised wrapper around :func:`_refl_mimsa_scalar` that evaluates the
     modified isotropic multiple-scattering Hapke model for an arbitrary
     number of pixels sharing the same Legendre coefficients and roughness.
+
+    .. note::
+        MIMSA is mathematically identical to :func:`refmod.hapke.amsa` with
+        all opposition-effect parameters left at zero (asserted by
+        ``test_mimsa_equals_amsa_no_opposition``). Prefer :func:`amsa` in
+        new code; this wrapper is kept for API stability.
 
     Parameters
     ----------
