@@ -1,6 +1,6 @@
 [project]
 name = "refmod"
-version = "1.0.0"
+version = "1.1.0"
 description = "Reflectance models in python"
 authors = [{ name = "Mirza Arnaut", email = "mirza.arnaut@tu-dortmund.de" }]
 license = { text = "MIT" }
@@ -18,9 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-jax-gpu = [
-  "jax-cuda12-plugin>=0.6.2",
-]
+jax-gpu = ["jax-cuda12-plugin>=0.6.2"]
 
 [dependency-groups]
 test = [
@@ -66,7 +64,6 @@ log_cli = false
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
-
 
 
 [tool.semantic_release]

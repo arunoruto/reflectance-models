@@ -114,23 +114,33 @@ pip install refmod
 
 ## Usage
 
-Here's a basic example of how to use `refmod` to calculate reflectance:
+Evaluate a reflectance model over an image and retrieve the albedo back
+from it:
 
 ```python
-import refmod
 import numpy as np
+from refmod.api import HapkeAmsaParams, reflectance_image, invert_albedo_multi
 
-# Define Hapke parameters
-incidence_angle = 30  # degrees
-emission_angle = 0    # degrees
-phase_angle = 30      # degrees
-ssa = 0.8             # single scattering albedo
-# ... other parameters like Henyey-Greenstein asymmetry parameter, porosity, etc.
+params = HapkeAmsaParams(b=0.21, c=0.7, hs=0.05, Bs0=0.2, tb=0.0)
 
-# Calculate reflectance
-# reflectance = refmod.hapke_isotropic(incidence_angle, emission_angle, phase_angle, ssa) # Example function
-# print(f"Reflectance: {reflectance}")
+albedo = np.full((32, 32), 0.4)
+normal = np.zeros((32, 32, 3))
+normal[..., 2] = 1.0
+
+sun = np.array([0.0, np.sin(np.deg2rad(30.0)), np.cos(np.deg2rad(30.0))])
+view = np.array([0.0, 0.0, 1.0])
+
+reflectance = reflectance_image("amsa", albedo, sun, view, normal, params, invalid="zero")
+estimated_albedo = invert_albedo_multi(
+    reflectance[None, ...], sun[None, ...], view[None, ...], normal, params
+)
+
+print(reflectance.shape)          # (32, 32)
+print(estimated_albedo.mean())    # ~0.4
 ```
+
+Model parameters can also be built from a configuration dictionary with
+`HapkeAmsaParams.from_dict({...})`.
 
 _For more detailed examples, please refer to the [Documentation](https://arunoruto.github.io/refmod/)_ <!-- TODO: Replace with actual documentation link -->
 
