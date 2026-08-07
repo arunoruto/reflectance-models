@@ -104,12 +104,16 @@ class HapkeAmsaParams:
 
         Pass external configuration ``c`` values directly to this object.
 
-        The MATLAB reference implementation negates ``c`` into an internal
-        variable (``c_hapke = -c``) and simultaneously swaps the signs in the
-        two Henyey-Greenstein denominators. Those two flips cancel, so the
-        value carried in configuration files equals the ``c`` used here and
-        needs no conversion. Verified against the reference sources
-        (``hapke_amsa_fast.m``) at the source level.
+        The MATLAB reference implementation used to negate ``c`` into an
+        internal variable (``c_hapke = -c``) and simultaneously swap the signs
+        in the two Henyey-Greenstein denominators. Those two flips cancelled,
+        so the value carried in configuration files equalled the ``c`` used
+        here and needed no conversion.
+
+        As of the toolbox's 2.0.0 release that double negation is gone: its
+        ``hapke_phase_dhg.m`` takes ``c`` in this same convention directly, so
+        the two sources now agree by inspection rather than by two errors
+        cancelling. The conclusion for callers is unchanged -- no conversion.
         """
         return dhg_legendre_coefficients(self.b, self.c, self.n_order)
 

@@ -3,7 +3,7 @@
 1. Roughness correction must keep the psi/pi * E1 denominator term for both
    effective cosines (Hapke 1984, Eqs. 47-50). The hopper fixtures cannot
    detect this because e = 0 deg makes the term vanish; here we compare
-   against a direct transcription of ``hapke_amsa.m`` at doubly-oblique
+   against a direct transcription of the MATLAB reference at doubly-oblique
    geometry.
 2. The coherent-backscatter factor must be continuous at exact opposition:
    B_CB(0) = 1 + B0.
@@ -20,7 +20,13 @@ from refmod.hapke._core import coherent_backscatter, roughness_correction
 
 
 def _matlab_roughness(tb, s, v, n):
-    """Single-pixel transcription of the roughness block of hapke_amsa.m."""
+    """Single-pixel transcription of the MATLAB roughness correction.
+
+    Transcribed from the block that was inline in ``hapke_amsa.m``. As of the
+    toolbox's 2.0.0 release it lives in ``src/private/hapke_roughness.m``,
+    shared by five models. It was extracted bit-exactly for ``hapke_amsa``, so
+    this transcription still matches the reference it was taken from.
+    """
     s = s / np.linalg.norm(s)
     v = v / np.linalg.norm(v)
     n = n / np.linalg.norm(n)

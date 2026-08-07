@@ -20,6 +20,18 @@ def cornette_legendre_coefficients(xi: float, n: int = 11) -> jax.Array:
     Implemented from the reference ``hapke_amsa_cornette.m``. These have not
     yet been fixture-validated against the reference output; prefer the
     Double Henyey-Greenstein models for validated results.
+
+    Notes
+    -----
+    Validating them is newly possible. Until the MATLAB toolbox's 2.0.0
+    release its two Cornette models could not serve as an oracle at all:
+    ``hapke_imsa_cornette.m`` divided the reflectance by :math:`4\pi` twice,
+    so it disagreed with :func:`imsa_cornette` here by a factor of 12.566, and
+    requesting any derivative from it raised ``Unrecognized function or
+    variable 'Bsh'``. (``hapke_amsa_cornette.m`` was unaffected by both.) Those
+    are fixed there and the MATLAB convention now matches this one, so a
+    ``cornette_*`` fixture added on that side would validate these
+    coefficients directly.
     """
     coeffs = [jnp.array(1.0)]
     denom = 2.0 + xi**2

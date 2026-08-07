@@ -114,6 +114,11 @@ MODELS = {
 # Models present in the fixtures with no refmod counterpart yet. Listing them
 # explicitly keeps them visible as skips rather than silently unexercised.
 NO_PORT = {
+    # Not just a matter of swapping in the exact H-function: the MATLAB model
+    # uses a roughness formulation without the `cos(i) == 1 | cos(e) == 1`
+    # guard that refmod's roughness_correction reproduces, and this fixture's
+    # first sample is i = e = 0. See the toolbox's docs/known-issues.md entry
+    # 10 and the note on refmod.hapke.imsa_modified_h.
     "hapke_imsa_modifiedH": "no port of the exact Hapke (2002) H-function IMSA",
     "hapke_amsa_int_legendre": "no port of the closed-form Legendre integrals",
 }

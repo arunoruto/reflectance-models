@@ -84,5 +84,26 @@ def imsa_modified_h(
 
     Note also that the reference ``hapke_imsa.m`` historically applied a
     spurious second factor of :math:`1/(4\pi)`; this implementation does not.
+    That defect is fixed upstream as of the toolbox's 2.0.0 release, so the
+    two now agree, and the ``imsa_approx_h`` fixture pins it.
+
+    Porting the exact-H variant is one decision away, not one function call
+    away. Swapping :func:`~refmod.hapke._core.h_function` in here reproduces
+    the ``imsa_exact_h`` fixture to 2e-16 at five of its six samples -- and
+    fails the sixth, ``i = e = 0``, by 1.8e-3 relative, which is five orders
+    above the fixture's 1e-8 tolerance.
+
+    The cause is not the H-function. ``hapke_imsa_modifiedH.m`` uses a
+    *different* roughness formulation from every other MATLAB model: it omits
+    the ``cos(i) == 1 | cos(e) == 1`` guard that
+    :func:`~refmod.hapke._core.roughness_correction` reproduces, so at exactly
+    normal incidence or emission it returns Hapke's limit
+    :math:`\mu_{0e} \to \chi(\bar\theta)\cos i` where this package returns the
+    uncorrected cosine. At :math:`\bar\theta = 8^\circ` that factor
+    :math:`\chi` is 0.9703, which is the whole discrepancy.
+
+    So the blocker is agreeing which limit is right, not writing the model.
+    See the toolbox's ``docs/known-issues.md`` entry 10 -- neither side has
+    taken that decision yet, and taking it moves published numbers on both.
     """
     return _imsa_modified_h_batched(w, b, c, i, e, n, roughness, h_sh, b0_sh)
