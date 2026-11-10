@@ -1,8 +1,11 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
 
-
-_POINTS = jnp.array(
+# NumPy, not jnp: a jnp array built at import takes the x64 setting in force
+# then, so importing refmod before enabling x64 truncated the table to float32
+# for the rest of the process. NumPy constants are converted when traced.
+_POINTS = np.array(
     [
         [370, 224],
         [380, 226],
@@ -141,11 +144,16 @@ _POINTS = jnp.array(
         [1710, 1394],
         [1720, 1394],
     ],
-    dtype=jnp.float64,
+    dtype=np.float64,
 )
 
-_LUT_X = jnp.concatenate(((_POINTS[:, 0] - 370.0) / (1722.0 - 370.0) * 160.0, jnp.array([160.0])))
-_LUT_Y = jnp.concatenate(((1473.0 - _POINTS[:, 1]) / (1473.0 - 199.0), jnp.array([(1473.0 - 1394.0) / (1473.0 - 199.0)])))
+_LUT_X = np.concatenate(((_POINTS[:, 0] - 370.0) / (1722.0 - 370.0) * 160.0, [160.0]))
+_LUT_Y = np.concatenate(
+    (
+        (1473.0 - _POINTS[:, 1]) / (1473.0 - 199.0),
+        [(1473.0 - 1394.0) / (1473.0 - 199.0)],
+    )
+)
 
 
 def lunar_lambert(

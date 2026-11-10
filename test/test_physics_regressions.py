@@ -152,3 +152,38 @@ def test_dhg_truncation_warning():
 
     n_rec = recommended_dhg_order(0.6, 0.7)
     assert dhg_truncation_error(0.6, 0.7, n_rec) < DHG_TRUNCATION_WARN_THRESHOLD
+
+
+def test_lunar_lambert_table_survives_late_x64():
+    """Importing refmod before enabling x64 must not freeze its tables at float32.
+
+    Runs in subprocesses without JAX_ENABLE_X64, which the dev shell sets and
+    which would otherwise hide the bug: x64 has to be off at import time.
+    """
+    import os
+    import subprocess
+    import sys
+
+    env = {k: v for k, v in os.environ.items() if k != "JAX_ENABLE_X64"}
+
+    evaluate = (
+        "import jax.numpy as jnp; from refmod.lunar_lambert import lunar_lambert; "
+        "print(repr(float(lunar_lambert(1.0, 0.5, 0.3, jnp.asarray(0.7345)))))"
+    )
+    enable = "import jax; jax.config.update('jax_enable_x64', True); "
+    early = subprocess.run(
+        [sys.executable, "-c", enable + evaluate],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+    late = subprocess.run(
+        [sys.executable, "-c", "import refmod.lunar_lambert; " + enable + evaluate],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+    assert late.stdout == early.stdout
+
