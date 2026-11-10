@@ -150,6 +150,18 @@ def test_matlab_parity(case):
     invalid_in_matlab = expected == 0.0
     compare = finite & ~invalid_in_matlab
 
+    # At exactly cos(i) == 1 or cos(e) == 1 MATLAB's roughness correction
+    # returns S = 1 with the uncorrected cosines, which is not the limit of
+    # its own formula; refmod returns the limit (pinned by
+    # test_physics_regressions.py::test_roughness_correction_is_continuous_at_zero_angles).
+    def unit(a):
+        a = np.asarray(_flat_vectors(a))
+        return a / np.linalg.norm(a, axis=-1, keepdims=True)
+
+    s, v, n = unit(data["fmS"]), unit(data["fmV"]), unit(data["fmN"])
+    at_limit = (np.sum(s * n, -1) == 1.0) | (np.sum(v * n, -1) == 1.0)
+    compare &= ~at_limit
+
     assert compare.sum() > 0, "no comparable pixels in this fixture"
 
     # refmod must not claim a value where MATLAB masked the geometry out.

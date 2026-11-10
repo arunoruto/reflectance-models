@@ -695,7 +695,13 @@ def _roughness_impl(
         -1.0 + EPS,
         1.0,
     )
-    psi = jnp.arccos(cos_psi)
+    # The clip is active whenever the normal lies in the plane of i and e,
+    # where rounding easily lands the quotient a hair above 1. There arccos'
+    # is infinite and the clip's derivative zero, and the chain rule makes
+    # that NaN. Evaluate arccos only where it is differentiable and take its
+    # value, zero, directly elsewhere.
+    in_plane = cos_psi >= 1.0
+    psi = jnp.where(in_plane, 0.0, jnp.arccos(jnp.where(in_plane, 0.0, cos_psi)))
     sin_psi = jnp.sin(psi)
     sin_psi_div_2_sq = jnp.abs(0.5 - cos_psi / 2.0)
 
@@ -761,8 +767,22 @@ def _roughness_impl(
     )
 
     s = s / div
-    s = jnp.where((cos_i == 1.0) | (cos_e == 1.0), 1.0, s)
-    cos_i_s = jnp.where((cos_i == 1.0) | (cos_e == 1.0), cos_i, cos_i_s)
-    cos_e_s = jnp.where((cos_i == 1.0) | (cos_e == 1.0), cos_e, cos_e_s)
+
+    # At i = 0 or e = 0 the azimuth psi is undefined and cot is infinite, so
+    # the general expressions are 0/0 there. Their limits are finite and
+    # psi-free: the exponentials in the infinite cot vanish, and so does the
+    # psi-weighted part of the denominator. Substituted below.
+    #
+    # The MATLAB reference (and refmod before this) returned S = 1 with the
+    # uncorrected cosines instead, which is not the limit: on the reference
+    # Hapke parameters R jumped by 0.5 % for a normal within ~1e-8 rad of the
+    # viewer -- every exactly-flat pixel under nadir view. Forward-mode
+    # derivatives take their tangent from the selected branch only, so the
+    # NaN tangents of the general branch at these points do not leak.
+    at_e = cos_e == 1.0
+    at_i = (cos_i == 1.0) & ~at_e
+    s = jnp.where(at_e, factor * cos_i / cos_i_s0, jnp.where(at_i, 1.0, s))
+    cos_i_s = jnp.where(at_e, cos_i_s0, jnp.where(at_i, factor * cos_i, cos_i_s))
+    cos_e_s = jnp.where(at_e, factor * cos_e, jnp.where(at_i, cos_e_s0, cos_e_s))
 
     return s, cos_i_s, cos_e_s
