@@ -187,3 +187,68 @@ def test_lunar_lambert_table_survives_late_x64():
     )
     assert late.stdout == early.stdout
 
+
+def test_roughness_correction_is_continuous_at_zero_angles():
+    """S and the effective cosines approach their e = 0 and i = 0 values smoothly.
+
+    Both the MATLAB reference and refmod used to return S = 1 with the
+    uncorrected cosines exactly at cos == 1, which is not the limit: mu_e
+    jumped from 0.9455 to 1 for a normal within ~1e-8 rad of the viewer.
+    """
+    rough = 0.19198621771937624
+    n = jnp.array([0.0, 0.0, 1.0])
+
+    def vec(angle, azimuth):
+        return jnp.array(
+            [
+                np.sin(angle) * np.cos(azimuth),
+                np.sin(angle) * np.sin(azimuth),
+                np.cos(angle),
+            ]
+        )
+
+    for make in (
+        lambda d: (vec(0.9, 0.0), vec(d, 1.0)),  # e -> 0
+        lambda d: (vec(d, 0.0), vec(0.7, 1.0)),  # i -> 0
+        lambda d: (vec(d, 0.0), vec(d, 1.0)),  # both
+    ):
+        exact = np.array(roughness_correction(rough, *make(0.0), n))
+        near = np.array(roughness_correction(rough, *make(1e-6), n))
+        np.testing.assert_allclose(exact, near, rtol=1e-8)
+
+
+def test_amsa_gradient_is_finite_with_normal_in_sun_view_plane():
+    """psi = 0 must not give NaN derivatives.
+
+    Here the normal lies in the plane of sun and view, and rounding puts the
+    cos(psi) quotient just above 1. The clip then fed arccos'(1) = -inf into
+    the chain rule. Geometry taken from a shape-from-shading run where it hit.
+    """
+    import jax
+
+    jax.config.update("jax_enable_x64", True)
+    from refmod.api import HapkeAmsaParams, reflectance_pq_and_grad_jax
+
+    params = HapkeAmsaParams(
+        b=0.21, c=0.7, hs=0.11, Bs0=3.1, tb=0.19198621771937624, hc=None, Bc0=None
+    )
+
+    def one(x):
+        return jnp.asarray(x, dtype=jnp.float64).reshape(1, 1, *np.shape(x))
+
+    sun = one([0.75082469, -0.45385596, 0.47987193])
+    view = one([0.0, 0.0, 1.0])
+    p, q, h = 0.027414135636370695, -0.016571206599273285, 1e-6
+    _, d_p, d_q = reflectance_pq_and_grad_jax(
+        "amsa", one(0.13), sun, view, one(p), one(q), params
+    )
+    r_plus = reflectance_pq_and_grad_jax(
+        "amsa", one(0.13), sun, view, one(p + h), one(q), params
+    )[0]
+    r_minus = reflectance_pq_and_grad_jax(
+        "amsa", one(0.13), sun, view, one(p - h), one(q), params
+    )[0]
+    assert np.isfinite(float(d_p[0, 0])) and np.isfinite(float(d_q[0, 0]))
+    np.testing.assert_allclose(
+        float(d_p[0, 0]), float((r_plus - r_minus)[0, 0]) / (2 * h), rtol=1e-6
+    )
